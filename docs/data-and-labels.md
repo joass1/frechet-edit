@@ -20,13 +20,34 @@ Therefore the public demos, tests and examples are synthetic. This is a licence
 constraint, not a preference, and it is the reason evidence level B is BLOCKED
 in `docs/experiment-protocol.md`.
 
-Additional unresolved items recorded rather than assumed:
+Additional items, and their current resolution status:
 
-* There is a version mismatch between the published GeoLife v1.2 user guide
-  and the archive currently offered for download. Before any use, the
-  actual archive's licence and version must be verified; the older guide is not
-  authoritative for a different archive.
+* ~~There is a version mismatch between the published GeoLife v1.2 user guide
+  and the archive currently offered for download.~~ **RESOLVED.** A GeoLife
+  archive has since been obtained locally and verified. It is
+  `Geolife Trajectories 1.3` and it ships its own authoritative
+  `User Guide-1.3.pdf`, so the v1.2 guide is no longer the reference for it.
+  Release history in that guide: v1.3 released 2012/08/01. Contents verified:
+  182 user folders, 18670 `.plt` trajectory files, 69 `labels.txt` files.
+* **Licence verified from the shipped v1.3 guide, section 7**, the Microsoft
+  Research License Agreement (Non-Commercial Use Only). Quoting the scope of
+  rights directly:
+
+  > You may use this Software for any non-commercial purpose, subject to the
+  > restrictions in this MSR-LA. Some purposes which can be non-commercial are
+  > teaching, academic research, public demonstrations and personal
+  > experimentation. **You may not distribute this Software or any derivative
+  > works in any form.**
+
+  So the assumption this document was already written against is confirmed
+  rather than overturned: non-commercial academic use is permitted, and
+  redistribution of the data **or of derivative works** is not. The rule in
+  section 1 stands unchanged and is now sourced rather than inferred.
 * Availability of a free download does not establish a redistribution right.
+
+The local archive lives under `data/raw/`, which is gitignored. Nothing derived
+from it may be committed, and no fixture, test or example may depend on a path
+inside it.
 
 ## 2. The harder problem is labels, not access
 
@@ -34,7 +55,11 @@ Even with the data in hand, neither dataset supplies the label this project
 needs.
 
 * GeoLife documents **transportation-mode** labels. A transportation mode is not
-  a route identity.
+  a route identity. Confirmed against the local v1.3 archive: `labels.txt` has
+  columns `Start Time`, `End Time`, `Transportation Mode`, with values such as
+  `bus` and `train`, and only 69 of 182 users carry a labels file at all. This
+  is the label that exists, not the label this project needs, so obtaining the
+  data does **not** unblock evidence level C.
 * T-Drive documents taxi id, timestamp, longitude and latitude. A **taxi id is
   not a route identity** either, and the dataset's reported average sampling
   interval of about 177 seconds and 623 metres makes it a sparse-sampling
