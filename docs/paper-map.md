@@ -53,14 +53,21 @@ time plot is not a proof of an asymptotic bound.
 
 - Whether a journal version supplies the substitution recurrence. Unresolved;
   S3 remains a derivation project, not a transcription.
-- **How the source states the vertical predecessor of the keep branch.** This
-  project's collapsed shorthand used `F(i-1,j)` and is demonstrably unsound
-  (deviation 1). That is a refutation of THIS project's transcription, not a
-  claimed erratum in the publication: the published DP state may already carry
-  the "edited prefix ends with sigma_j" restriction in prose or in its state
-  definition. To be re-checked against the full version before any public
-  statement. The implementation is unaffected either way, because the layered
-  form is proved correct independently and agrees with the oracle.
+- ~~**How the source states the vertical predecessor of the keep branch.**~~
+  **RESOLVED, and it is the publication's recurrence, not only this project's
+  shorthand.** Both versions were re-checked directly: the SoCG version of
+  record (Sec. 5.2) and the arXiv full version (Sec. 5.2, and Sec. 5.3 for
+  `edDP`) both display `IedDP(i-1, j)`, the unrestricted table, as the vertical
+  predecessor of the keep branch. arXiv lists only `v1`; no revision changes it.
+  The published recurrence therefore under-reports on the counterexample in
+  deviation 1. The paper's own parenthetical - "it is important to note for
+  later that if `||sigma_j - pi_i|| <= delta` it does not imply `sigma'` ends
+  with `sigma_j`" - identifies the exact hazard, but no later passage
+  constrains the branch, and a single table indexed by `(i, j)` cannot express
+  the restriction. Full statement, worked trace and verification counts in
+  `docs/errata-insertion-recurrence.md`; executable evidence in
+  `tests/property/test_published_recurrence.py`. Theorems 20 and 21 are NOT
+  refuted: the layered correction runs in the same `O(m^2 + mn)` bound.
 - Exact full-version theorem numbering for the continuous deletion result.
   Recorded as "to re-verify" rather than asserted.
 
