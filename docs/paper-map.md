@@ -42,9 +42,12 @@ time plot is not a proof of an asymptotic bound.
    2. See `docs/recurrences.md` Sec. 3.2 and
    `tests/unit/test_equivalence.py::TestCollapsedFormIsUnsoundWithInsertions`.
    For deletion-only the two forms do agree, and that is checked exhaustively.
-2. **Dimension scope.** Insertion and mixed modes are restricted to d in {1,2}
-   because only those minimum-enclosing-ball backends are certified here. The
-   theorem is not dimension-restricted in that way.
+2. **Dimension scope.** Insertion and mixed modes are certified for d from 1 to
+   8. The former restriction to the plane was lifted by `_meb`, which computes
+   the exact minimum enclosing ball in any dimension by support refinement; the
+   remaining cap is a cost bound, not a correctness one. The theorem is not
+   dimension-restricted at all, so this is still a narrowing, just a far smaller
+   one than before.
 3. **Numerical policy.** The paper works in a real-RAM model. This
    implementation adds an explicit certified/abstaining predicate policy
    (`docs/numerics.md`); abstention is a reported status, not an answer.

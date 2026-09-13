@@ -63,15 +63,85 @@ def meb_radius_exact(points):
     return best  # squared radius in 2-D; compared as squared below
 
 
+def _solve(matrix, rhs):
+    """Independent exact linear solve, written for this oracle only."""
+    n = len(matrix)
+    aug = [[*list(row), rhs[i]] for i, row in enumerate(matrix)]
+    for col in range(n):
+        piv = None
+        for r in range(col, n):
+            if aug[r][col] != 0:
+                piv = r
+                break
+        if piv is None:
+            return None
+        aug[col], aug[piv] = aug[piv], aug[col]
+        lead = aug[col][col]
+        aug[col] = [v / lead for v in aug[col]]
+        for r in range(n):
+            if r != col and aug[r][col] != 0:
+                f = aug[r][col]
+                aug[r] = [v - f * w for v, w in zip(aug[r], aug[col], strict=True)]
+    return [aug[i][n] for i in range(n)]
+
+
+def _circumcentre_nd(subset):
+    """Centre equidistant from every point of `subset`, or None if undetermined.
+
+    Exhaustive-subset MEB for dimension 3 and above. This shares its algebra
+    with the package's `_meb.circumball` - same derivation, separately written -
+    so oracle independence in d >= 3 is weaker than in d <= 2, where the oracle
+    shares nothing with the implementation. Stated rather than glossed.
+    """
+    base = subset[0]
+    vecs = [tuple(a - b for a, b in zip(p, base, strict=True)) for p in subset[1:]]
+    if not vecs:
+        return base
+    gram = [[2 * sum((a * b for a, b in zip(vi, vj, strict=True)), Fraction(0)) for vj in vecs]
+            for vi in vecs]
+    rhs = [sum((c * c for c in vi), Fraction(0)) for vi in vecs]
+    sol = _solve(gram, rhs)
+    if sol is None:
+        return None
+    out = list(base)
+    for coeff, vec in zip(sol, vecs, strict=True):
+        for k, comp in enumerate(vec):
+            out[k] += coeff * comp
+    return tuple(out)
+
+
+def _meb_sq_radius_nd(pts):
+    best = None
+    n = len(pts)
+    dim = len(pts[0])
+    for size in range(1, min(dim + 1, n) + 1):
+        for subset in itertools.combinations(pts, size):
+            centre = _circumcentre_nd(list(subset))
+            if centre is None:
+                continue
+            r2 = max(sum(((a - b) ** 2 for a, b in zip(p, centre, strict=True)), Fraction(0))
+                     for p in pts)
+            on = sum(((a - b) ** 2 for a, b in zip(subset[0], centre, strict=True)), Fraction(0))
+            if r2 > on:
+                continue
+            if best is None or r2 < best:
+                best = r2
+    return best
+
+
 def meb_within(points, delta):
     """Is the minimum enclosing ball radius of `points` at most delta?"""
     if len(points) <= 1:
         return True
     d = len(points[0])
-    r = meb_radius_exact(points)
     if d == 1:
-        return r <= Fraction(delta)
-    return r <= Fraction(delta) ** 2  # squared comparison in 2-D
+        return meb_radius_exact(points) <= Fraction(delta)
+    if d == 2:
+        return meb_radius_exact(points) <= Fraction(delta) ** 2
+    pts = [tuple(Fraction(c) for c in p) for p in points]
+    r2 = _meb_sq_radius_nd(pts)
+    assert r2 is not None
+    return r2 <= Fraction(delta) ** 2
 
 
 def mu_indices(pi, delta):

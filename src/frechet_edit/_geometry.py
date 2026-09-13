@@ -24,10 +24,13 @@ from __future__ import annotations
 import random
 from collections.abc import Sequence
 from fractions import Fraction
-from typing import NamedTuple
 
 import numpy as np
 
+from ._meb import FracBall, exact_meb_nd
+from ._meb import ball_from_one as _ball_from_one
+from ._meb import ball_from_two as _ball_from_two
+from ._meb import encloses as _encloses
 from ._numerics import (
     EXACT_BALL_MAX_POINTS,
     SAFETY,
@@ -44,28 +47,8 @@ from ._numerics import (
 DEFAULT_SEED = 20240612
 
 
-class FracBall(NamedTuple):
-    """An exactly represented ball."""
-
-    centre: tuple[Fraction, ...]
-    sq_radius: Fraction
-
-
 def _frac_point(p: Sequence[float]) -> tuple[Fraction, ...]:
     return tuple(Fraction(float(x)) for x in p)
-
-
-def _sq_dist_frac(a: Sequence[Fraction], b: Sequence[Fraction]) -> Fraction:
-    return sum(((x - y) * (x - y) for x, y in zip(a, b, strict=True)), Fraction(0))
-
-
-def _ball_from_one(p: Sequence[Fraction]) -> FracBall:
-    return FracBall(tuple(p), Fraction(0))
-
-
-def _ball_from_two(a: Sequence[Fraction], b: Sequence[Fraction]) -> FracBall:
-    centre = tuple((x + y) / 2 for x, y in zip(a, b, strict=True))
-    return FracBall(centre, _sq_dist_frac(a, centre))
 
 
 def _circumball_2d(
@@ -83,10 +66,6 @@ def _circumball_2d(
     ux = (cy * b2 - by * c2) / d
     uy = (bx * c2 - cx * b2) / d
     return FracBall((ax + ux, ay + uy), ux * ux + uy * uy)
-
-
-def _encloses(ball: FracBall, pts: Sequence[Sequence[Fraction]]) -> bool:
-    return all(_sq_dist_frac(p, ball.centre) <= ball.sq_radius for p in pts)
 
 
 def _exact_meb_2d(pts: Sequence[tuple[Fraction, ...]]) -> FracBall:
@@ -117,7 +96,7 @@ def _exact_meb_2d(pts: Sequence[tuple[Fraction, ...]]) -> FracBall:
 
 
 def exact_meb(points: np.ndarray) -> FracBall:
-    """Exact minimum enclosing ball of a point set in dimension 1 or 2."""
+    """Exact minimum enclosing ball of a point set in any supported dimension."""
     if len(points) == 0:
         raise ValueError("exact_meb requires at least one point")
     dim = points.shape[1]
@@ -127,26 +106,34 @@ def exact_meb(points: np.ndarray) -> FracBall:
         hi = max(p[0] for p in pts)
         half = (hi - lo) / 2
         return FracBall(((lo + hi) / 2,), half * half)
-    if dim != 2:
-        raise ValueError(f"exact_meb supports dimension 1 or 2, got {dim}")
     if len(pts) > EXACT_BALL_MAX_POINTS:
         raise NumericallyAmbiguous(
             f"exact enclosing-ball enumeration is capped at {EXACT_BALL_MAX_POINTS} "
             f"points, got {len(pts)}"
         )
-    return _exact_meb_2d(pts)
+    if dim == 2:
+        return _exact_meb_2d(pts)
+    # Dimension 3 and above. The planar enumeration would need C(n, d+1)
+    # candidate subsets, so it is replaced by support refinement; see _meb.
+    try:
+        return exact_meb_nd(pts, dim)
+    except RuntimeError as exc:
+        raise NumericallyAmbiguous(str(exc)) from exc
 
 
 def exact_meb_small(pts: Sequence[tuple[Fraction, ...]]) -> FracBall:
-    """Exact minimum enclosing ball of at most three already-rational points."""
+    """Exact minimum enclosing ball of a small already-rational support set."""
     if len(pts) == 1:
         return _ball_from_one(pts[0])
-    if len(pts[0]) == 1:
+    dim = len(pts[0])
+    if dim == 1:
         lo = min(p[0] for p in pts)
         hi = max(p[0] for p in pts)
         half = (hi - lo) / 2
         return FracBall(((lo + hi) / 2,), half * half)
-    return _exact_meb_2d(pts)
+    if dim == 2:
+        return _exact_meb_2d(pts)
+    return exact_meb_nd(pts, dim)
 
 
 # ---------------------------------------------------------------------------
@@ -211,10 +198,34 @@ def _welzl_support_2d(pts: np.ndarray, rng: random.Random) -> list[int]:
     return sup
 
 
+def _diameter_triple(pts: np.ndarray) -> list[int]:
+    """A cheap candidate subset for dimension 3 and above.
+
+    A far-apart pair plus the point farthest from their midpoint. This is only a
+    candidate generator: whatever it returns is a SUBSET of the block, so the
+    exact ball computed from it is a lower bound on the block's own minimum
+    enclosing ball, and the NO certificate built from it stays sound. A weak
+    guess costs a trip to the exact path, never an answer.
+
+    A full Welzl pass in general dimension would give a tighter subset. It is
+    not worth it here: dimension 3 and above is the uncommon case, and the exact
+    path behind this is complete on its own.
+    """
+    centroid = pts.mean(axis=0)
+    first = int(np.argmax(((pts - centroid) ** 2).sum(axis=1)))
+    second = int(np.argmax(((pts - pts[first]) ** 2).sum(axis=1)))
+    midpoint = (pts[first] + pts[second]) / 2.0
+    third = int(np.argmax(((pts - midpoint) ** 2).sum(axis=1)))
+    return [first, second, third]
+
+
 def _support_indices(pts: np.ndarray, rng: random.Random) -> list[int]:
-    if pts.shape[1] == 1:
+    dim = pts.shape[1]
+    if dim == 1:
         return [int(np.argmin(pts[:, 0])), int(np.argmax(pts[:, 0]))]
-    return _welzl_support_2d(pts, rng)
+    if dim == 2:
+        return _welzl_support_2d(pts, rng)
+    return _diameter_triple(pts)
 
 
 def meb_radius_le(
@@ -277,7 +288,9 @@ def meb_radius_le(
             f"enclosing-ball decision for a block of {len(block)} points sits on the "
             f"delta boundary and exceeds the exact cap of {EXACT_BALL_MAX_POINTS}"
         )
-    return _exact_meb_2d(pts).sq_radius <= delta2
+    # Dimension-general: exact_meb dispatches to the planar enumeration for
+    # d <= 2 and to support refinement above it.
+    return exact_meb(block).sq_radius <= delta2
 
 
 def mu_indices(

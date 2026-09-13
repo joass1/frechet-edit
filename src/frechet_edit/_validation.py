@@ -16,7 +16,12 @@ from ._types import BACKENDS, OPERATIONS, Operations, UnsupportedDimensionError
 
 #: Dimensions for which each mode has a certified backend.
 #: Deletion needs point distances only; insertion needs enclosing balls.
-INSERTION_DIMENSIONS: tuple[int, ...] = (1, 2)
+#: Insertion-capable modes work in any dimension up to this bound. The limit is
+#: the cost of the exact enclosing-ball kernel, whose per-round work grows like
+#: 2**(d+2) candidate subsets each solving a d x d rational system, so it stops
+#: being practical well before it stops being correct. Raised from the former
+#: plane-only restriction once `_meb` supplied a general-dimension exact ball.
+MAX_INSERTION_DIMENSION: int = 8
 
 NUMERIC_POLICIES: tuple[str, ...] = ("certified", "fast")
 
@@ -102,7 +107,7 @@ def check_pair(reference: np.ndarray, observation: np.ndarray) -> int:
 
 
 def check_mode_dimension(mode: Operations, dimension: int) -> None:
-    """Insertion-capable modes are certified for 1-D and 2-D only.
+    """Insertion-capable modes are certified up to MAX_INSERTION_DIMENSION.
 
     This is a scope restriction of the enclosing-ball backend shipped here, not
     a limitation of the underlying theorem, and it is reported as its own
@@ -110,9 +115,10 @@ def check_mode_dimension(mode: Operations, dimension: int) -> None:
     """
     if mode == "delete":
         return
-    if dimension not in INSERTION_DIMENSIONS:
+    if dimension > MAX_INSERTION_DIMENSION:
         raise UnsupportedDimensionError(
-            f"operations={mode!r} is certified for dimensions {INSERTION_DIMENSIONS} "
-            f"only, got {dimension}. The restriction is in this package's "
-            "minimum-enclosing-ball backend, not in the underlying result."
+            f"operations={mode!r} is certified for dimensions 1 to "
+            f"{MAX_INSERTION_DIMENSION}, got {dimension}. The restriction is the "
+            "cost of this package's exact minimum-enclosing-ball backend, not a "
+            "limitation of the underlying result."
         )

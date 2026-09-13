@@ -55,7 +55,7 @@ def discrete_edit_distance(
         Comparisons are closed (``distance <= delta``).
     operations:
         ``"delete"``, ``"insert"`` or ``"both"``. Insertion-capable modes are
-        certified for dimensions 1 and 2 only.
+        certified for dimensions 1 to 8; deletion has no dimension bound.
     return_witness:
         When true, also return a replayable edit script, the edited curve and a
         coupling. Costs the ``O(mn)`` parent tables of the reference backend.

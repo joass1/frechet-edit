@@ -48,10 +48,12 @@ Read this before using the package or citing anything from it.
 ## Scope restrictions of this implementation
 
 * Insertion-capable modes (`insert`, `both`) are certified for **dimensions 1
-  and 2 only**, because that is where the enclosing-ball backend is certified.
-  This is a product restriction of this package, not a limitation of the
-  underlying theorem, and an unsupported dimension raises
-  `UnsupportedDimensionError` rather than being silently degraded.
+  to 8**. The bound is the cost of the exact enclosing-ball kernel, whose
+  per-round work grows like `2**(d+2)` candidate subsets each solving a `d x d`
+  rational system, so it stops being practical well before it stops being
+  correct. Deletion-only has no such bound, because it needs no enclosing ball.
+  Beyond the cap, `UnsupportedDimensionError` is raised rather than silently
+  degrading. This is a product restriction, not a limitation of the theorem.
 * `delta` must be finite and strictly positive. Zero-threshold support is not
   in this release.
 * Public inputs must be non-empty and finite.

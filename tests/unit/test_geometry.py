@@ -93,9 +93,18 @@ class TestExactMEB:
         assert ball.centre == (Fraction(1),)
         assert ball.sq_radius == 16
 
-    def test_unsupported_dimension_rejected(self):
-        with pytest.raises(ValueError, match="dimension 1 or 2"):
-            exact_meb(np.zeros((3, 3)))
+    def test_three_dimensions_now_resolve_rather_than_raising(self):
+        """exact_meb used to reject d >= 3; it now dispatches to `_meb`."""
+        pts = np.array([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
+        ball = exact_meb(pts)
+        assert ball.centre == (Fraction(1), Fraction(0), Fraction(0))
+        assert ball.sq_radius == 1
+
+    def test_too_many_points_still_abstains(self):
+        from frechet_edit._numerics import EXACT_BALL_MAX_POINTS
+
+        with pytest.raises(NumericallyAmbiguous, match="capped"):
+            exact_meb(np.zeros((EXACT_BALL_MAX_POINTS + 1, 3)))
 
 
 class TestBallPredicate:

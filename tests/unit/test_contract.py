@@ -82,13 +82,24 @@ class TestDimensionScope:
         assert discrete_edit_distance(ref, obs, delta=1.0, operations="delete").cost == 0
 
     @pytest.mark.parametrize("mode", ["insert", "both"])
-    def test_insertion_rejects_unsupported_dimension_explicitly(self, mode):
-        ref = np.zeros((3, 3))
-        obs = np.zeros((3, 3))
+    @pytest.mark.parametrize("dim", [1, 2, 3, 5, 8])
+    def test_insertion_accepts_every_dimension_up_to_the_cap(self, mode, dim):
+        """The plane-only restriction was lifted once `_meb` supplied a
+        general-dimension exact enclosing ball."""
+        ref = np.zeros((3, dim))
+        obs = np.zeros((3, dim))
+        result = discrete_edit_distance(ref, obs, delta=1.0, operations=mode)
+        assert result.status == "optimal"
+        assert result.dimension == dim
+
+    @pytest.mark.parametrize("mode", ["insert", "both"])
+    def test_insertion_rejects_beyond_the_cap_explicitly(self, mode):
+        ref = np.zeros((3, 9))
+        obs = np.zeros((3, 9))
         with pytest.raises(UnsupportedDimensionError) as exc:
             discrete_edit_distance(ref, obs, delta=1.0, operations=mode)
         # Not silently degraded, and not reported as infeasible.
-        assert "dimensions (1, 2)" in str(exc.value)
+        assert "dimensions 1 to 8" in str(exc.value)
 
 
 class TestDirectedness:

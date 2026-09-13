@@ -53,10 +53,11 @@ accident.
 ## 5. Supported dimensions
 
 - `operations="delete"`: any d >= 1 (deletion needs only point distances).
-- `operations="insert"` and `"both"`: d in {1, 2} for this release, because the
-  engineered minimum-enclosing-ball backend is implemented and certified for
-  1D and 2D only. This is a PRODUCT SCOPE restriction, not a limitation of the
-  underlying theorem, which holds in any fixed dimension.
+- `operations="insert"` and `"both"`: 1 <= d <= 8. The cap is the cost of the
+  exact minimum-enclosing-ball kernel, whose per-round work grows like
+  `2**(d+2)` candidate subsets each solving a `d x d` rational system. This is a
+  PRODUCT SCOPE restriction, not a limitation of the underlying theorem, which
+  holds in any fixed dimension.
 - An unsupported dimension raises `UnsupportedDimensionError`. It is never
   silently downgraded, projected, or reported as infeasible.
 

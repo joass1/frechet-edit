@@ -196,3 +196,64 @@ class TestTheCauseIsExactlyOneTerm:
                 assert repaired_insertion_dp(pi, sigma, delta) == truth, (pi, sigma)
                 compared += 1
         assert compared == 39 * 12
+
+
+class TestDimensionsAboveThePlane:
+    """The dimension cap was lifted; this is the end-to-end check that it works.
+
+    `_meb` is unit-tested on its own, but the question that matters here is
+    whether the DP still agrees with the definition once blocks live in 3-D and
+    4-D, where a different enclosing-ball backend runs.
+    """
+
+    @pytest.mark.parametrize("dim", [3, 4])
+    @pytest.mark.parametrize("mode", ["delete", "insert", "both"])
+    def test_agrees_with_brute_force(self, dim, mode):
+        rng = random.Random(1000 + dim)
+        compared = 0
+        for _ in range(20):
+            pi = [
+                tuple(float(rng.randint(0, 3)) for _ in range(dim))
+                for _ in range(rng.randint(1, 3))
+            ]
+            sigma = [
+                tuple(float(rng.randint(0, 3)) for _ in range(dim))
+                for _ in range(rng.randint(1, 2))
+            ]
+            delta = rng.choice([0.5, 1.0, 1.5, 2.0])
+            truth = brute_edit_distance(pi, sigma, delta, mode)
+            assert _package(pi, sigma, delta, mode) == truth, (dim, pi, sigma, delta)
+            compared += 1
+        assert compared == 20
+
+    def test_the_erratum_witness_lifted_into_3d_still_needs_two_insertions(self):
+        pi = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 0.0, 0.0)]
+        sigma = [(0.0, 0.0, 0.0)]
+        assert _package(pi, sigma, 0.4, "insert") == 2
+
+    def test_a_genuinely_three_dimensional_block(self):
+        """Tetrahedron vertices: the covering ball is not a planar circle."""
+        pi = [
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+            (0.5, 0.9, 0.0),
+            (0.5, 0.3, 0.8),
+        ]
+        sigma = [(0.5, 0.4, 0.2)]
+        truth = brute_edit_distance(pi, sigma, 0.6, "insert")
+        assert _package(pi, sigma, 0.6, "insert") == truth
+
+    def test_beyond_the_cap_raises_rather_than_degrading(self):
+        from frechet_edit import UnsupportedDimensionError
+
+        with pytest.raises(UnsupportedDimensionError, match="dimensions 1 to"):
+            discrete_edit_distance(
+                np.zeros((3, 9)), np.zeros((2, 9)), 1.0, operations="insert"
+            )
+
+    def test_deletion_is_unrestricted_by_dimension(self):
+        """Deletion needs no enclosing ball, so the cap must not apply to it."""
+        result = discrete_edit_distance(
+            np.zeros((3, 12)), np.zeros((2, 12)), 1.0, operations="delete"
+        )
+        assert result.status == "optimal"
