@@ -35,7 +35,7 @@ theorems.
 
 ## 2. Source
 
-Kyle Fox, Amir Nayyeri, Hannah Miller Perry, Benjamin Raichel, *Fréchet Edit
+Emily Fox, Amir Nayyeri, Jonathan James Perry, Benjamin Raichel, *Fréchet Edit
 Distance*, SoCG 2024, LIPIcs vol. 293, 58:1-58:15,
 DOI 10.4230/LIPIcs.SoCG.2024.58; full version arXiv:2403.12878.
 

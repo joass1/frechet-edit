@@ -22,14 +22,15 @@ references:
     title: "Frechet Edit Distance"
     authors:
       - family-names: Fox
-        given-names: Kyle
+        given-names: Emily
       - family-names: Nayyeri
         given-names: Amir
       - family-names: Perry
-        given-names: Hannah
-        name-particle: Miller
+        given-names: Jonathan James
+        orcid: "https://orcid.org/0009-0003-0042-249X"
       - family-names: Raichel
         given-names: Benjamin
+        orcid: "https://orcid.org/0000-0001-6584-4843"
     collection-title: "40th International Symposium on Computational Geometry (SoCG 2024)"
     collection-type: proceedings
     volume: 293
