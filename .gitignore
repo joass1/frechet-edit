@@ -13,8 +13,7 @@ data/raw/
 data/interim/
 runs/
 
-# local tool and editor state
-.hermes/
+# local editor state
 .idea/
 .vscode/
 *.swp
