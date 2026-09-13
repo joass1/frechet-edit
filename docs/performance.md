@@ -16,7 +16,7 @@ python benchmarks/bench_memory.py
 
 | key | value |
 |---|---|
-| frechet-edit | 0.1.0.dev0 |
+| frechet-edit | 0.1.0 |
 | Python | 3.11.9 |
 | NumPy | 2.4.6 |
 | OS | Windows 11 (10.0.26200) |

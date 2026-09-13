@@ -23,7 +23,7 @@ The preregistration this run was measured against is docs/experiment-protocol.md
 
 | key | value |
 |---|---|
-| frechet_edit | `0.1.0.dev0` |
+| frechet_edit | `0.1.0` |
 | numpy | `2.4.6` |
 | platform | `Windows-10-10.0.26200-SP0` |
 | python | `3.11.9` |

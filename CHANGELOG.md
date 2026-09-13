@@ -59,7 +59,17 @@ but nothing in it has been independently reviewed. See
 
 ### Known limitations
 
-- Insertion-capable modes are certified for dimensions 1 and 2 only.
+- Insertion-capable modes are certified for dimensions 1 to 8. The cap is the
+  cost of the exact enclosing-ball kernel, not a correctness boundary.
+  Deletion-only has no dimension bound.
 - Continuous variants, weak variants and substitutions are not implemented.
-- Only synthetic (evidence level A) empirical results exist. No real trajectory
-  data was used or downloaded. See `docs/limitations.md`.
+- No native extension. Profiling showed the bottleneck was per-call overhead on
+  small inputs, which a compiled extension would not help; see
+  `docs/performance.md`.
+- Empirical evidence reaches level B: real GeoLife trajectory geometry with
+  ground truth known by construction from the injected corruption. That is NOT
+  evidence of natural route recovery. Level C, which needs blinded annotation,
+  remains blocked. No trajectory data is distributed here.
+- **Nothing in this release has been independently reviewed.** Every phase in
+  `docs/reviews/STATUS.md` sits at READY_FOR_REVIEW. A passing test suite is
+  evidence, not a signoff.
