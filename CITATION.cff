@@ -1,0 +1,42 @@
+cff-version: 1.2.0
+title: "frechet-edit: strong discrete Frechet edit distance with verifiable witnesses"
+message: >-
+  This software is an INDEPENDENT implementation of algorithms published by
+  Fox, Nayyeri, Perry and Raichel. If you use it, please cite BOTH this
+  software and the original paper below. Citing this software is not a citation
+  of the underlying result.
+type: software
+authors:
+  - family-names: Lau
+    given-names: Joash
+version: 0.1.0.dev0
+license: MIT
+repository-code: "https://github.com/joass1/frechet-edit"
+keywords:
+  - Frechet distance
+  - edit distance
+  - trajectory matching
+  - computational geometry
+references:
+  - type: conference-paper
+    title: "Frechet Edit Distance"
+    authors:
+      - family-names: Fox
+        given-names: Kyle
+      - family-names: Nayyeri
+        given-names: Amir
+      - family-names: Perry
+        given-names: Hannah
+        name-particle: Miller
+      - family-names: Raichel
+        given-names: Benjamin
+    collection-title: "40th International Symposium on Computational Geometry (SoCG 2024)"
+    collection-type: proceedings
+    volume: 293
+    year: 2024
+    start: 1
+    end: 15
+    doi: "10.4230/LIPIcs.SoCG.2024.58"
+    notes: >-
+      Full version available as arXiv:2403.12878. This software was written
+      from the published description; no code from the authors was used.

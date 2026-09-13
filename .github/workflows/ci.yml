@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / py${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+      # The fast suite must stay offline and deterministic. Real datasets are
+      # never fetched here; see docs/data-and-labels.md. A missing dataset must
+      # never let a skipped test read as a passing real-data gate, which is why
+      # the `realdata` marker is deselected explicitly rather than left to skip.
+      - name: Tests (fast)
+        run: python -m pytest -q -m "not slow and not realdata" --durations=10
+      - name: Verify no test was silently deselected to nothing
+        shell: bash
+        run: |
+          count=$(python -m pytest -q -m "not slow and not realdata" --collect-only 2>/dev/null | tail -1)
+          echo "collected: $count"
+          python - <<'PY'
+          import subprocess, sys
+          out = subprocess.run(
+              [sys.executable, "-m", "pytest", "-m", "not slow and not realdata",
+               "--collect-only", "-q"],
+              capture_output=True, text=True,
+          ).stdout
+          n = sum(1 for line in out.splitlines() if "::" in line)
+          print(f"{n} tests collected")
+          if n < 300:
+              sys.exit(f"expected at least 300 collected tests, got {n}")
+          PY
+
+  slow:
+    name: Exhaustive oracle tier
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+      - name: Oracle agreement (slow)
+        run: python -m pytest -q -m slow --durations=10
+
+  quality:
+    name: Lint, types, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+      - name: Ruff
+        run: python -m ruff check src tests experiments benchmarks examples
+      - name: Mypy (strict, package only)
+        run: python -m mypy
+      - name: Build wheel and sdist
+        run: |
+          python -m build
+          python -m twine check dist/*
+      - name: Install the built wheel in a clean env and run the examples
+        shell: bash
+        run: |
+          python -m venv /tmp/fresh
+          /tmp/fresh/bin/python -m pip install --upgrade pip
+          /tmp/fresh/bin/python -m pip install dist/*.whl
+          cd /tmp        # outside the checkout, so nothing resolves by accident
+          /tmp/fresh/bin/python "$GITHUB_WORKSPACE/examples/basic_edits.py"
+          /tmp/fresh/bin/python "$GITHUB_WORKSPACE/examples/route_audit.py"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/

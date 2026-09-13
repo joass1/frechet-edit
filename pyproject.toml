@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "frechet-edit"
+version = "0.1.0.dev0"
+description = "Strong discrete Frechet edit distance with verifiable minimal-edit witnesses"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Joash Lau" }]
+keywords = ["frechet", "edit-distance", "trajectory", "curve-matching", "computational-geometry"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Mathematics",
+  "Typing :: Typed",
+]
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "hypothesis>=6.90", "ruff>=0.5", "mypy>=1.8", "build>=1.0", "twine>=5.0"]
+experiments = ["matplotlib>=3.7"]
+
+[project.urls]
+Homepage = "https://github.com/joass1/frechet-edit"
+Documentation = "https://github.com/joass1/frechet-edit/tree/main/docs"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+frechet_edit = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "experiments"]
+markers = [
+  "slow: exhaustive oracle comparisons and large sweeps (deselect with -m 'not slow')",
+  "realdata: requires a locally provisioned, licence-checked dataset; never runs in CI",
+]
+filterwarnings = ["error::RuntimeWarning"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests", "experiments"]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "RUF"]
+ignore = ["E741"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B011"]
+
+[tool.mypy]
+python_version = "3.10"
+packages = ["frechet_edit"]
+mypy_path = "src"
+strict = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = "numpy.*"
+ignore_missing_imports = true

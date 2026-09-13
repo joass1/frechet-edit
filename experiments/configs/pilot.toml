@@ -1,0 +1,25 @@
+# Pilot configuration. Evidence level A: synthetic routes only.
+# Frozen before looking at any outcome, per docs/experiment-protocol.md.
+
+seed = 20240612
+
+# Gallery
+n_families = 6            # 5 routes each: base + 4 hard negatives = 30 templates
+n_points = 40
+
+# Queries
+queries_per_route = 2
+n_spikes = 2
+spike_magnitude = 150.0   # metres, far outside delta
+jitter_sigma = 2.0        # metres, background noise on every vertex
+n_open_set_queries = 4    # queries that match nothing in the gallery
+
+# Scoring
+delta = 25.0              # metres; FED threshold and the eps used by EDR/LCSS
+eps = 25.0
+filter_window = 3
+ks = [1, 5]
+# Acceptance thresholds are derived per method on the validation families
+# below, never shared across incommensurable scales and never tuned on test.
+n_validation_families = 2
+threshold_quantile = 0.95

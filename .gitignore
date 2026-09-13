@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+.venv/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+artifacts/
+data/raw/
+data/interim/
+runs/
+
+# local tool and editor state
+.hermes/
+.idea/
+.vscode/
+*.swp
+.DS_Store
