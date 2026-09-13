@@ -167,3 +167,33 @@ def paper_deletion_dp(pi, sigma, delta):
             else:
                 F[i][j] = min(F[i][j - 1], F[i - 1][j], F[i - 1][j - 1])
     return F[m][n]
+
+
+def repaired_insertion_dp(pi, sigma, delta):
+    """The published recurrence with ONE term changed, to isolate the cause.
+
+    K(i,j) is the best solution whose edited prefix ends with the kept point
+    sigma_j; P(i,j) the best ending with an inserted point; X = min(K, P) is the
+    paper's IedDP. Only the vertical predecessor of the keep branch differs from
+    the published form: K(i-1, j) rather than X(i-1, j). Coupling pi_i to sigma_j
+    requires sigma_j to still be the last element of the edited prefix, which a
+    predecessor ending in an inserted point cannot offer.
+
+    See docs/errata-insertion-recurrence.md section 6.1.
+    """
+    m, n = len(pi), len(sigma)
+    mu = mu_indices(pi, delta)
+    K = [[INF] * (n + 1) for _ in range(m + 1)]
+    P = [[INF] * (n + 1) for _ in range(m + 1)]
+    X = [[INF] * (n + 1) for _ in range(m + 1)]
+    X[0][0] = 0
+    for i in range(m + 1):
+        for j in range(n + 1):
+            if i == 0:
+                X[i][j] = 0 if j == 0 else INF
+                continue
+            P[i][j] = 1 + min(X[k - 1][j] for k in range(mu[i], i + 1))
+            if j >= 1 and dist(sigma[j - 1], pi[i - 1]) <= delta:
+                K[i][j] = min(X[i][j - 1], K[i - 1][j], X[i - 1][j - 1])
+            X[i][j] = min(K[i][j], P[i][j])
+    return X[m][n]

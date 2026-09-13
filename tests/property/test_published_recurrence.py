@@ -170,3 +170,29 @@ class TestWiderSweep:
             assert failures == 0
         else:
             assert failures > 0
+
+
+class TestTheCauseIsExactlyOneTerm:
+    """Changing only the keep branch's vertical predecessor must fix it.
+
+    This is what separates a diagnosis from a symptom. If some other part of the
+    published recurrence were also wrong, restricting this single term would not
+    be enough and these tests would fail.
+    """
+
+    def test_the_minimal_witness_is_repaired(self):
+        from tests.oracles.published_recurrence import repaired_insertion_dp
+
+        assert repaired_insertion_dp(WITNESS_PI, WITNESS_SIGMA, WITNESS_DELTA) == 2
+
+    @pytest.mark.parametrize("delta", [0.4, 1.0, 2.0])
+    def test_one_term_removes_every_failure(self, delta):
+        from tests.oracles.published_recurrence import repaired_insertion_dp
+
+        compared = 0
+        for pi in _curves(3):
+            for sigma in _curves(2):
+                truth = brute_edit_distance(pi, sigma, delta, "insert")
+                assert repaired_insertion_dp(pi, sigma, delta) == truth, (pi, sigma)
+                compared += 1
+        assert compared == 39 * 12

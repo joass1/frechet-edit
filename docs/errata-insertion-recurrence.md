@@ -145,6 +145,33 @@ all `mu(i)` (Lemma 18, unchanged) plus `O(mn)` for the layered DP, i.e. the
 `O(m^2 + mn)` of Theorems 20 and 21. The published complexity results are
 therefore unaffected.
 
+### 6.1 Exactly one term is at fault
+
+It is worth being precise about how small the repair is, because it pins the
+cause rather than merely removing the symptom. Writing the keep branch as
+
+```
+K(i,j) = min( X(i, j-1),  K(i-1, j),  X(i-1, j-1) )     when ||sigma_j - pi_i|| <= delta
+P(i,j) = 1 + min_{mu(i) <= k <= i} X(k-1, j)
+X(i,j) = min( K(i,j), P(i,j) )
+```
+
+only the **middle term of `K`** differs from the published form. The other two
+keep terms legitimately draw on the unrestricted `X`:
+
+* `X(i, j-1)` appends `sigma_j` after whatever the predecessor ended with,
+  which is always allowed, since `sigma_j` follows it in the original order;
+* `X(i-1, j-1)` does the same while also advancing `pi`;
+* `K(i-1, j)` is different in kind. It couples `pi_i` to a `sigma_j` that is
+  **already** the last element of the predecessor's edited curve, so the
+  predecessor must itself end with `sigma_j`. A predecessor ending in an
+  inserted point cannot supply that, and `X(i-1, j)` includes exactly those.
+
+Changing that one term and nothing else makes the recurrence agree with the
+definition on all 4320 instances of the insertion sweep, with zero failures.
+The insertion branch, the `mu(i)` construction of Lemma 18 and the queue of
+Lemma 19 are all untouched and all correct.
+
 ## 7. Verification
 
 Three implementations that share no recurrence were compared:
