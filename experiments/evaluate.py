@@ -30,7 +30,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import tomllib
 
 import frechet_edit
 from experiments import baselines, corruptions, synthetic
@@ -270,13 +269,34 @@ def run(cfg: dict[str, Any], out_dir: Path) -> dict[str, Any]:
     return payload
 
 
+def _load_toml(path: Path) -> dict[str, Any]:
+    """Parse a TOML config.
+
+    Imported lazily and only here: `tomllib` is 3.11+, and the package supports
+    3.10. Keeping this out of module scope means importing `experiments.evaluate`
+    - which the test suite does on every supported version - never depends on a
+    parser that 3.10 lacks.
+    """
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:  # pragma: no cover - exercised only on 3.10
+        try:
+            import tomli as tomllib  # type: ignore[no-redef]
+        except ImportError as exc:
+            raise ImportError(
+                "Reading a TOML config on Python 3.10 needs tomli: "
+                'pip install -e ".[experiments]", or use Python 3.11+.'
+            ) from exc
+    return dict(tomllib.loads(path.read_text(encoding="utf-8")))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--run-dir", type=Path, default=None)
     args = parser.parse_args()
 
-    cfg = tomllib.loads(args.config.read_text(encoding="utf-8"))
+    cfg = _load_toml(args.config)
     run_dir = args.run_dir or Path("runs") / time.strftime("%Y%m%d-%H%M%S")
     payload = run(cfg, run_dir)
 

@@ -38,8 +38,27 @@ now a declared dev dependency, so the coverage figure is reproducible from a
 clean checkout rather than from an ad-hoc install.
 
 Environment: Python 3.11.9, NumPy 2.4.6, pytest 9.1.1, Hypothesis 6.168.0,
-Windows 11. CI is configured for Linux/Windows/macOS on Python 3.10-3.12 but
-**has not been executed** - no CI run exists yet.
+Windows 11.
+
+CI has now been executed for the first time, and its first run **failed**, which
+is the point of running it. Two real defects that local development could not
+have surfaced:
+
+1. **Python 3.10 was broken on every platform.** `experiments/evaluate.py`
+   imported `tomllib` at module scope, which is 3.11+, so importing the module
+   raised on 3.10 and collection failed. The package declares
+   `requires-python = ">=3.10"`, so this was a genuine unsupported-version bug
+   and not a CI misconfiguration. Fixed by parsing TOML lazily inside the CLI
+   entry point, where it is the only thing that needs a parser.
+2. **The strict type check was broken by a dependency, not by this code.** NumPy
+   2.5's own stubs use PEP 695 `type` statements, which mypy can only parse when
+   targeting Python 3.12 or later, so `python_version = "3.10"` failed inside
+   numpy before reaching this package. The type target is now 3.12; actual 3.10
+   support is verified by running the suite on 3.10, which is the check that
+   tests the claim.
+
+Both were reproduced locally in a clean interpreter before being fixed, not
+guessed at from the CI summary.
 
 ## Findings about the published algorithm
 

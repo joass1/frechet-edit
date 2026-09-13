@@ -22,7 +22,7 @@ dependencies = ["numpy>=1.24"]
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4", "pytest-cov>=4.1", "hypothesis>=6.90", "ruff>=0.5", "mypy>=1.8", "build>=1.0", "twine>=5.0"]
-experiments = ["matplotlib>=3.7"]
+experiments = ["matplotlib>=3.7", "tomli>=2.0; python_version < '3.11'"]
 
 [project.urls]
 Homepage = "https://github.com/joass1/frechet-edit"
@@ -55,7 +55,12 @@ ignore = ["E741"]
 "tests/**" = ["B011"]
 
 [tool.mypy]
-python_version = "3.10"
+# Type checking targets 3.12 even though the package RUNS on 3.10+. NumPy's own
+# stubs use PEP 695 `type` statements, which mypy can only parse when targeting
+# 3.12 or later, so a 3.10 target now fails inside numpy before it reaches this
+# package. Actual 3.10 support is verified where it matters, by running the test
+# suite on 3.10 in CI.
+python_version = "3.12"
 packages = ["frechet_edit"]
 mypy_path = "src"
 strict = true

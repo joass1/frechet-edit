@@ -123,8 +123,13 @@ class TestSourceResolution:
         assert geolife.resolve_source(target) == target
 
 
+@pytest.mark.realdata
 class TestAgainstTheRealArchive:
-    """Skipped wherever the dataset is absent. Never substitutes fake data."""
+    """Needs a locally provisioned archive; deselected in CI by the marker.
+
+    Also skips if the archive is absent, so a local run without the dataset is
+    honest rather than red. It never substitutes fake data for real.
+    """
 
     @pytest.fixture
     def archive(self):
