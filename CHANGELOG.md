@@ -3,12 +3,30 @@
 All notable changes to this project are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] - 0.1.0.dev0
+## [0.1.0] - 2026-09-14
 
-Initial development release. Not published to any package index.
+First published release. Alpha: the discrete library is complete and tested,
+but nothing in it has been independently reviewed. See
+[docs/limitations.md](docs/limitations.md) and
+[docs/reviews/STATUS.md](docs/reviews/STATUS.md) before relying on it.
 
 ### Added
 
+- **Dimensions 1 to 8** for insertion-capable modes. The first release plan
+  restricted `insert` and `both` to the plane; `_meb` now computes the exact
+  minimum enclosing ball in any dimension by support refinement. Deletion has
+  no dimension bound at all. The remaining cap is a cost bound, not a
+  correctness one.
+- `docs/errata-insertion-recurrence.md`, recording that the recurrence
+  published for the insertion and mixed variants is unsound, with a minimal
+  counterexample, a worked trace and the verification counts behind it. The
+  complexity theorems are not affected.
+- `experiments/geolife.py` and `experiments/configs/geolife.toml`, an evidence
+  level B evaluation on real GeoLife trajectory geometry. No trajectory data is
+  distributed with this package and none may be.
+- `experiments/freespace_viz.py`, free-space diagram rendering for the
+  continuous Frechet distance, cross-checked against the exact Alt-Godau
+  decision procedure.
 - `discrete_edit_distance` implementing the strong discrete Frechet edit
   distance in all three modes (`delete`, `insert`, `both`).
 - Arbitrary-location vertex insertion via minimum-enclosing-ball geometry, so a

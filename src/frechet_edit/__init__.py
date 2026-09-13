@@ -26,7 +26,7 @@ from ._types import (
 from .api import discrete_edit_distance, ordinary_discrete_frechet
 from .verify import VerificationReport, replay, verify_witness
 
-__version__ = "0.1.0.dev0"
+__version__ = "0.1.0"
 
 __all__ = [
     "Deletion",
