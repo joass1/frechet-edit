@@ -22,9 +22,11 @@ green the test suite is. A passing suite is evidence, not a signoff.
 ## Verification actually run
 
 ```
-pytest -q -m "not slow"     456 passed, 10 deselected
-pytest -q -m slow            10 passed  (exhaustive oracle tier)
-pytest --cov=frechet_edit    91% line coverage over src/frechet_edit
+470 tests collected in total, split as:
+pytest -q -m "not slow"                     460 passed, 10 deselected
+pytest -q -m slow                            10 passed  (exhaustive oracle tier)
+pytest -q -m "not slow and not realdata"    457 passed, 13 deselected  (CI's selection)
+pytest --cov=frechet_edit                    91% line coverage over src/frechet_edit
 ruff check src tests experiments benchmarks examples   All checks passed
 mypy                          Success: no issues found in 11 source files
 python -m build               wheel + sdist
@@ -58,7 +60,13 @@ have surfaced:
    tests the claim.
 
 Both were reproduced locally in a clean interpreter before being fixed, not
-guessed at from the CI summary.
+guessed at from the CI summary. **CI is now green on all nine matrix jobs**
+(Linux/Windows/macOS x Python 3.10/3.11/3.12), plus the slow oracle tier and the
+lint/type/build job.
+
+The three `realdata` tests need a locally provisioned archive and are deselected
+in CI by marker, so a missing dataset can never read as a passing real-data
+gate.
 
 ## Findings about the published algorithm
 
