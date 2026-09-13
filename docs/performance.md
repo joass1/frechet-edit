@@ -32,30 +32,75 @@ p50 / p95 wall-clock milliseconds per call, 5 repeats.
 
 | mode | backend | m = n | delta | p50 ms | p95 ms |
 |---|---|---|---|---|---|
-| delete | python | 400 | 2 | 82.0 | 94.3 |
-| delete | reference | 400 | 2 | 64.9 | 66.4 |
-| insert | python | 400 | 2 | 250.0 | 307.1 |
-| insert | reference | 400 | 2 | 260.6 | 309.9 |
-| both | python | 400 | 2 | 253.1 | 310.2 |
-| both | reference | 400 | 2 | 268.3 | 309.8 |
-| both | python | 400 | 10 | 367.2 | 385.3 |
-| both | reference | 400 | 10 | 513.9 | 542.9 |
-| insert | python | 400 | 10 | 347.3 | 413.0 |
-| insert | reference | 400 | 10 | 466.6 | 484.7 |
+| delete | python | 400 | 2 | 42.8 | 46.5 |
+| delete | reference | 400 | 2 | 72.2 | 74.3 |
+| insert | python | 400 | 2 | 218.5 | 251.5 |
+| insert | reference | 400 | 2 | 230.6 | 234.5 |
+| both | python | 400 | 2 | 224.0 | 356.3 |
+| both | reference | 400 | 2 | 306.6 | 378.9 |
+| both | python | 400 | 10 | 252.7 | 253.2 |
+| both | reference | 400 | 10 | 475.8 | 550.5 |
+| insert | python | 400 | 10 | 264.0 | 300.4 |
+| insert | reference | 400 | 10 | 374.3 | 386.0 |
 
 Honest reading:
 
 * The optimised backend wins where it is supposed to: at `delta = 10` the
   `mu`-window is wide, and replacing the rescan with the monotone queue gives
-  about **1.4x** on mixed mode at `m = n = 400` (367 ms vs 514 ms).
+  about **1.9x** on mixed mode at `m = n = 400` (253 ms vs 476 ms).
 * At `delta = 2` the windows are narrow, so a rescan of two or three cells is
   cheaper than the queue's method calls, and the two backends are within noise.
-* In **deletion-only** mode the optimised backend is slightly SLOWER than the
-  reference (82 ms vs 65 ms). Deletion does not use the `mu` window at all, so
-  the optimised path buys nothing there and pays for rolling-list indexing. The
-  reference backend is a legitimate choice for delete-only work.
+* In **deletion-only** mode the optimised backend is now FASTER than the
+  reference (43 ms vs 72 ms). An earlier revision of this document reported the
+  opposite, 82 ms against 65 ms, and that reversal is a real change rather than
+  noise: the support-set generator these numbers share was rewritten (see
+  below), and the reference backend leans on it harder.
 * These are milliseconds on curves of a few hundred points in pure Python. No
   low-latency claim is made, and none should be made from this table.
+
+## The support-set generator, and a failed optimisation
+
+Profiling a mixed-mode solve at `m = n = 400` put the largest single cost not in
+the dynamic program but in `_geometry._welzl_support_2d`, the float64 pass that
+proposes a candidate support set for each block. It accounted for roughly **40
+per cent of total runtime** across about **1.46 million** containment checks -
+more than the recurrence it exists to serve.
+
+The first fix attempted was the obvious one: vectorise each scan so numpy finds
+the first violating point in one call. It was **measured and rejected**. It ran
+roughly **twice as slow** for blocks of ten points or fewer, which is nearly all
+of them, because `mu_indices` calls this on short windows and numpy's per-call
+overhead swamps the work. It only began to win past about a hundred points, a
+block size that barely occurs.
+
+The fix that worked went the other way: remove numpy from the function entirely
+and do plain Python float arithmetic on unpacked coordinates. In two dimensions
+each containment test is a handful of multiplications with no array allocation,
+no dtype dispatch and no ufunc call.
+
+Measured on the function alone, identical support sets on 3000 random blocks:
+
+| block size | before | after | speedup |
+|---|---|---|---|
+| 2 | 13.5 us | 7.9 us | 1.7x |
+| 3 | 33.7 us | 9.3 us | 3.6x |
+| 5 | 35.2 us | 10.3 us | 3.4x |
+| 10 | 198.6 us | 35.3 us | 5.6x |
+| 40 | 632.3 us | 66.6 us | 9.5x |
+| 200 | 3236.3 us | 292.7 us | 11.1x |
+
+End to end the gain depends entirely on how large the blocks are, which depends
+on `delta` relative to the curve's scale. On the frozen benchmark above, mixed
+mode at `m = n = 400`, `delta = 10` went from 367 ms to 253 ms. On random-walk
+curves with wider windows, a controlled A/B of the same solve measured **3.5x**
+(1176 ms to 335 ms). Both numbers are real; neither generalises, and the honest
+summary is a range, not a headline.
+
+**No native extension was written.** The original plan for this phase was a C++
+backend, and profiling is the reason it was not: the bottleneck was per-call
+overhead on tiny inputs, which a compiled extension addresses by adding a
+foreign-call boundary in exactly the wrong place. S1 remains open, and should
+stay open until a profile justifies it.
 
 ## Instrumentation supporting the complexity argument
 

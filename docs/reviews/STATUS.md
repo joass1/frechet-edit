@@ -15,7 +15,7 @@ green the test suite is. A passing suite is evidence, not a signoff.
 | P5 | held-out application validation | levels A and B done; **BLOCKED** at level C | `docs/experiment-protocol.md`, `docs/results.md` (A), `docs/results-geolife.md` (B) |
 | P6-L | library release | READY_FOR_REVIEW | wheel + sdist built, fresh-env install verified, `tests/integration/` |
 | P6-A | application-evidence release | **NOT CLAIMED** | level B evidence now exists; level C does not, and no release claims it |
-| S1 | native backend | NOT_STARTED | - |
+| S1 | native backend | NOT_STARTED, and deliberately so | profiling found the bottleneck was per-call overhead on tiny inputs, which a compiled extension makes worse, not better; see `docs/performance.md` |
 | S2 | continuous deletion | NOT_STARTED | free-space RENDERING only, `experiments/freespace_viz.py`; no continuous edit algorithm |
 | S3 | substitutions | NOT_STARTED | - |
 

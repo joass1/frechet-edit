@@ -147,54 +147,65 @@ def _welzl_support_2d(pts: np.ndarray, rng: random.Random) -> list[int]:
     This is a candidate generator only. Every decision it feeds is afterwards
     certified (or refuted) in exact arithmetic, so a float slip here costs
     performance, never correctness.
+
+    Deliberately free of numpy. Profiling a mixed-mode solve at m = n = 400
+    showed this function dominating the whole package - 1.46 million containment
+    checks, 40 percent of total runtime, more than the dynamic program it feeds.
+    The obvious fix, vectorising each scan, was tried and measured and made
+    things WORSE: roughly twice as slow for blocks of ten points or fewer, which
+    is nearly all of them, because `mu_indices` calls this on short windows and
+    numpy's per-call overhead swamps the work. It only won past about a hundred
+    points, a size that barely occurs.
+
+    So the arithmetic here is plain Python floats on unpacked coordinates. In
+    two dimensions that is a handful of multiplications with no array allocation,
+    no dtype dispatch and no ufunc call.
     """
     n = len(pts)
     order = list(range(n))
     rng.shuffle(order)
+    # Unpack once into scalars; every operation below is plain float arithmetic.
+    xs = [float(v) for v in pts[:, 0]]
+    ys = [float(v) for v in pts[:, 1]]
 
-    def ball1(i: int) -> tuple[np.ndarray, float, list[int]]:
-        return pts[i].copy(), 0.0, [i]
+    def ball2(i: int, j: int) -> tuple[float, float, float, list[int]]:
+        cx = (xs[i] + xs[j]) / 2.0
+        cy = (ys[i] + ys[j]) / 2.0
+        dx, dy = xs[i] - cx, ys[i] - cy
+        return cx, cy, dx * dx + dy * dy, [i, j]
 
-    def ball2(i: int, j: int) -> tuple[np.ndarray, float, list[int]]:
-        c = (pts[i] + pts[j]) / 2.0
-        return c, float(np.dot(pts[i] - c, pts[i] - c)), [i, j]
-
-    def ball3(i: int, j: int, k: int) -> tuple[np.ndarray, float, list[int]]:
-        a, b, c = pts[i], pts[j], pts[k]
-        bx, by = b[0] - a[0], b[1] - a[1]
-        cx, cy = c[0] - a[0], c[1] - a[1]
-        det = 2.0 * (bx * cy - by * cx)
-        if det == 0.0:
-            best = max(
-                (ball2(i, j), ball2(i, k), ball2(j, k)), key=lambda t: t[1]
-            )
-            return best
+    def ball3(i: int, j: int, k: int) -> tuple[float, float, float, list[int]]:
+        ax, ay = xs[i], ys[i]
+        bx, by = xs[j] - ax, ys[j] - ay
+        cx_, cy_ = xs[k] - ax, ys[k] - ay
+        det = 2.0 * (bx * cy_ - by * cx_)
+        if det == 0.0:  # collinear: the widest defining pair wins
+            return max((ball2(i, j), ball2(i, k), ball2(j, k)), key=lambda t: t[2])
         b2 = bx * bx + by * by
-        c2 = cx * cx + cy * cy
-        ux = (cy * b2 - by * c2) / det
-        uy = (bx * c2 - cx * b2) / det
-        return np.array([a[0] + ux, a[1] + uy]), ux * ux + uy * uy, [i, j, k]
+        c2 = cx_ * cx_ + cy_ * cy_
+        ux = (cy_ * b2 - by * c2) / det
+        uy = (bx * c2 - cx_ * b2) / det
+        return ax + ux, ay + uy, ux * ux + uy * uy, [i, j, k]
 
-    def outside(cen: np.ndarray, r2: float, idx: int) -> bool:
-        diff = pts[idx] - cen
-        return float(np.dot(diff, diff)) > r2 + 1e-12 * max(r2, 1.0)
-
-    cen, r2, sup = ball1(order[0])
+    cx, cy, r2, sup = xs[order[0]], ys[order[0]], 0.0, [order[0]]
     for a in range(1, n):
         ia = order[a]
-        if not outside(cen, r2, ia):
+        dx, dy = xs[ia] - cx, ys[ia] - cy
+        if dx * dx + dy * dy <= r2 + 1e-12 * (r2 if r2 > 1.0 else 1.0):
             continue
-        cen, r2, sup = ball1(ia)
+        cx, cy, r2, sup = xs[ia], ys[ia], 0.0, [ia]
         for b in range(a):
             ib = order[b]
-            if not outside(cen, r2, ib):
+            dx, dy = xs[ib] - cx, ys[ib] - cy
+            if dx * dx + dy * dy <= r2 + 1e-12 * (r2 if r2 > 1.0 else 1.0):
                 continue
-            cen, r2, sup = ball2(ia, ib)
+            cx, cy, r2, sup = ball2(ia, ib)
             for c in range(b):
                 ic = order[c]
-                if not outside(cen, r2, ic):
+                dx, dy = xs[ic] - cx, ys[ic] - cy
+                if dx * dx + dy * dy <= r2 + 1e-12 * (r2 if r2 > 1.0 else 1.0):
                     continue
-                cen, r2, sup = ball3(ia, ib, ic)
+                cx, cy, r2, sup = ball3(ia, ib, ic)
     return sup
 
 
