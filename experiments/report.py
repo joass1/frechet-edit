@@ -67,13 +67,33 @@ def render(summary: dict[str, Any], per_query: list[dict[str, Any]]) -> str:
 
     add("# Retrieval pilot report")
     add("")
-    add("> ## EVIDENCE LEVEL A - SYNTHETIC DATA ONLY")
-    add("> ")
-    add(f"> {summary['evidence_warning']}")
-    add("> ")
-    add("> No real trajectory was used, downloaded, or derived from. These numbers")
-    add("> describe the MECHANISM of the measures on constructed fixtures. They are")
-    add("> not evidence about GPS traces, route recovery, or any deployment.")
+    # The banner is derived from the run, never hardcoded: a level A banner on a
+    # level B run would misreport the strength of the evidence, which is the one
+    # mistake this report exists to prevent.
+    level = str(summary.get("evidence_level", "A"))
+    if level.startswith("B"):
+        add("> ## EVIDENCE LEVEL B - REAL GEOMETRY, CORRUPTION-DERIVED LABELS")
+        add("> ")
+        add(f"> {summary['evidence_warning']}")
+        add("> ")
+        add("> The base curves are measured GPS traces, so these numbers DO describe")
+        add("> real trajectory geometry. The ground truth is still known by")
+        add("> construction, not observed, so they are NOT evidence of natural route")
+        add("> recovery and NOT evidence of any deployment.")
+        source_ids = summary.get("geolife_source_ids") or []
+        if source_ids:
+            add("> ")
+            add(f"> Source traces ({len(source_ids)}): `{'`, `'.join(source_ids)}`.")
+            add("> No trajectory coordinates are reproduced here; the dataset licence")
+            add("> forbids redistributing the data or any derivative work.")
+    else:
+        add("> ## EVIDENCE LEVEL A - SYNTHETIC DATA ONLY")
+        add("> ")
+        add(f"> {summary['evidence_warning']}")
+        add("> ")
+        add("> No real trajectory was used, downloaded, or derived from. These numbers")
+        add("> describe the MECHANISM of the measures on constructed fixtures. They are")
+        add("> not evidence about GPS traces, route recovery, or any deployment.")
     add("")
 
     env = summary["environment"]

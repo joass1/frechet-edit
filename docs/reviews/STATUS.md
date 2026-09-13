@@ -9,21 +9,22 @@ green the test suite is. A passing suite is evidence, not a signoff.
 |---|---|---|---|
 | P0 | contract, recurrences, witness invariants, numerics, oracle protocol, environment | READY_FOR_REVIEW | `docs/definition.md`, `docs/recurrences.md`, `docs/witness-invariants.md`, `docs/numerics.md`, `docs/oracle-protocol.md`, `docs/paper-map.md` |
 | P1 | deletion-only spine, witnesses, verifier | READY_FOR_REVIEW | `tests/unit/test_deletion.py`, `test_witness.py`, exhaustive Oracle A agreement |
-| P2 | real-data pilot | **BLOCKED** | no licensed dataset present; see `docs/data-and-labels.md` |
+| P2 | real-data pilot | READY_FOR_REVIEW | GeoLife 1.3 obtained locally (gitignored); `experiments/geolife.py`, `experiments/test_geolife.py`, `docs/results-geolife.md` |
 | P3 | insertion geometry, mixed edits, oracles | READY_FOR_REVIEW | `tests/unit/test_geometry.py`, `test_insertion.py`, `test_mixed.py`, Oracle B agreement |
 | P4 | optimised backend, measured performance | READY_FOR_REVIEW | `docs/performance.md`, `benchmarks/`, `tests/unit/test_minqueue.py` |
-| P5 | held-out application validation | **BLOCKED** at levels B and C; level A done | `docs/experiment-protocol.md`, `runs/pilot/report.md` |
+| P5 | held-out application validation | levels A and B done; **BLOCKED** at level C | `docs/experiment-protocol.md`, `docs/results.md` (A), `docs/results-geolife.md` (B) |
 | P6-L | library release | READY_FOR_REVIEW | wheel + sdist built, fresh-env install verified, `tests/integration/` |
-| P6-A | application-evidence release | **NOT CLAIMED** | requires P2/P5 evidence that does not exist |
+| P6-A | application-evidence release | **NOT CLAIMED** | level B evidence now exists; level C does not, and no release claims it |
 | S1 | native backend | NOT_STARTED | - |
-| S2 | continuous deletion | NOT_STARTED | - |
+| S2 | continuous deletion | NOT_STARTED | free-space RENDERING only, `experiments/freespace_viz.py`; no continuous edit algorithm |
 | S3 | substitutions | NOT_STARTED | - |
 
 ## Verification actually run
 
 ```
-pytest -q -m "not slow"     398 passed, 4 deselected
-pytest -q -m slow             2 passed  (exhaustive oracle tier, ~87 s)
+pytest -q -m "not slow"     456 passed, 10 deselected
+pytest -q -m slow            10 passed  (exhaustive oracle tier)
+pytest --cov=frechet_edit    91% line coverage over src/frechet_edit
 ruff check src tests experiments benchmarks examples   All checks passed
 mypy                          Success: no issues found in 11 source files
 python -m build               wheel + sdist
@@ -31,9 +32,31 @@ python -m twine check dist/*  PASSED
 fresh venv + wheel install    examples run from outside the checkout
 ```
 
+The earlier note here recorded "2 passed" for the slow tier, which was the count
+before the later slow tests were added; it is corrected above. `pytest-cov` is
+now a declared dev dependency, so the coverage figure is reproducible from a
+clean checkout rather than from an ad-hoc install.
+
 Environment: Python 3.11.9, NumPy 2.4.6, pytest 9.1.1, Hypothesis 6.168.0,
 Windows 11. CI is configured for Linux/Windows/macOS on Python 3.10-3.12 but
 **has not been executed** - no CI run exists yet.
+
+## Findings about the published algorithm
+
+**The published insertion and mixed recurrences are unsound (severity: CRITICAL
+for anyone transcribing them).** Re-checked against the SoCG version of record
+and the arXiv full version: both display the unrestricted `IedDP(i-1, j)` as the
+vertical predecessor of the keep branch, so the counterexample below applies to
+the publication and not merely to this project's earlier shorthand. Verified by
+three implementations sharing no recurrence - a verbatim transcription of the
+published form, a definitional brute force with no dynamic program, and this
+package. Over 23480 comparisons the published form was wrong 294 times, always
+an under-estimate; this package was wrong zero times. The published deletion
+recurrence is sound and was confirmed so. Theorems 20 and 21 are NOT refuted:
+the layered correction keeps the same `O(m^2 + mn)` bound. Full statement in
+`docs/errata-insertion-recurrence.md`; evidence in
+`tests/property/test_published_recurrence.py`. The authors have not been
+contacted.
 
 ## Defects found and fixed during this work
 

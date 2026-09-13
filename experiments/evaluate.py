@@ -120,10 +120,36 @@ def make_queries(
 def run(cfg: dict[str, Any], out_dir: Path) -> dict[str, Any]:
     seed = int(cfg.get("seed", 20240612))
     rng = np.random.default_rng(seed)
+    n_families = int(cfg.get("n_families", 6))
+    n_points = int(cfg.get("n_points", 40))
+
+    # Evidence level is decided here and nowhere else. Level A generates its own
+    # base curves; level B takes them from real trajectories. Everything
+    # downstream - hard negatives, corruptions, metrics - is identical, so the
+    # only thing that changes is where the geometry came from.
+    gallery_source = str(cfg.get("gallery_source", "synthetic"))
+    bases = None
+    source_ids: list[str] | None = None
+    if gallery_source == "geolife":
+        from experiments import geolife
+
+        trajectories = geolife.load_base_trajectories(
+            n_families,
+            n_points=n_points,
+            source=cfg.get("geolife_source"),
+            min_separation_m=float(cfg.get("geolife_min_separation_m", 5000.0)),
+            spacing_m=float(cfg.get("geolife_spacing_m", 10.0)),
+        )
+        bases = [t.points for t in trajectories]
+        source_ids = [t.source_id for t in trajectories]
+    elif gallery_source != "synthetic":
+        raise ValueError(f"unknown gallery_source {gallery_source!r}")
+
     routes = synthetic.make_gallery(
         rng,
-        n_families=int(cfg.get("n_families", 6)),
-        n_points=int(cfg.get("n_points", 40)),
+        n_families=n_families,
+        n_points=n_points,
+        bases=bases,
     )
     queries = make_queries(rng, routes, cfg)
     methods = build_methods(cfg)
@@ -200,13 +226,32 @@ def run(cfg: dict[str, Any], out_dir: Path) -> dict[str, Any]:
             f"{sorted(val_families)}, which supply no test query"
         )
 
-    payload = {
-        "evidence_level": "A (synthetic mechanism tests only)",
-        "evidence_warning": (
+    if gallery_source == "geolife":
+        evidence_level = "B (real trajectory geometry, corruption-derived labels)"
+        evidence_warning = (
+            "Base curves are real GeoLife traces; the hard negatives are derived "
+            "from them and the queries are corrupted copies, so ground truth is "
+            "known BY CONSTRUCTION and is not a natural route-identity label. "
+            "This supports a claim about recovering a source trajectory under "
+            "injected corruption, and NOT a claim about route matching in the "
+            "wild. Level C of docs/experiment-protocol.md remains BLOCKED: it "
+            "needs blinded annotation that no dataset supplies."
+        )
+    else:
+        evidence_level = "A (synthetic mechanism tests only)"
+        evidence_warning = (
             "These routes are generated, not measured. No real trajectory data was "
             "used. Nothing here supports a claim about real GPS traces, and levels "
             "B and C of docs/experiment-protocol.md remain BLOCKED."
-        ),
+        )
+
+    payload = {
+        "evidence_level": evidence_level,
+        "evidence_warning": evidence_warning,
+        "gallery_source": gallery_source,
+        # Source file stems only: provenance for reproducibility, no coordinates.
+        # GeoLife may not be redistributed, so no trajectory data is written here.
+        "geolife_source_ids": source_ids,
         "config": cfg,
         "environment": {
             "frechet_edit": frechet_edit.__version__,

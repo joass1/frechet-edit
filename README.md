@@ -102,26 +102,54 @@ semantics. Three points catch people out:
 | [performance.md](docs/performance.md) | measured time and memory |
 | [experiment-protocol.md](docs/experiment-protocol.md) | preregistration and actual outcomes |
 | [data-and-labels.md](docs/data-and-labels.md) | why there is no real data here |
-| [results.md](docs/results.md) | the actual pilot results, losses included |
+| [results.md](docs/results.md) | level A pilot results, losses included |
+| [results-geolife.md](docs/results-geolife.md) | level B results on real GeoLife geometry |
+| [errata-insertion-recurrence.md](docs/errata-insertion-recurrence.md) | **the published recurrence is unsound**, with the counterexample |
 | [limitations.md](docs/limitations.md) | **read this one** |
 | [reviews/STATUS.md](docs/reviews/STATUS.md) | phase status, defects found, what to attack |
 
 ## A finding worth knowing
 
-While building this, an exhaustive test plus an independent oracle refuted a
-plausible-looking *collapsed* form of the recurrence: the one whose "keep"
-branch takes the unrestricted `F(i-1, j)` as its vertical predecessor. It is
-**unsound** once insertions are allowed.
+**The insertion recurrence as published is unsound.** The "keep" branch takes
+the unrestricted `IedDP(i-1, j)` as its vertical predecessor, but an optimal
+solution for that prefix may end with a newly *inserted* point, and a monotone
+coupling cannot step back past it to reuse `sigma_j`. The recurrence admits
+solutions that do not exist, so it can under-report.
 
 ```
-R = [0, 1, 0],  Q = [0],  delta = 0.4,  insert-only
-collapsed form: 1        layered form: 2        oracle: 2
+pi = <0, 1, 0>,  sigma = <0>,  delta = 0.4,  insertions only
+published recurrence: 1          true optimum: 2
 ```
 
-The state must record whether the edited prefix *ends with* the observation
-vertex being kept. The implementation therefore splits the DP into layered
-`K` / `P` / `X` states. Details, counterexample and the open source-verification
-item are in [`docs/recurrences.md` §3.2](docs/recurrences.md).
+Verified against the SoCG version of record and the arXiv full version, which
+display the same recurrence, by three implementations sharing no recurrence: a
+verbatim transcription of the published form, a definitional brute force with no
+dynamic program, and this package. Across 23480 comparisons the published form
+was wrong 294 times, **always an under-estimate**; this package was wrong zero
+times. The published *deletion* recurrence is sound, and was confirmed so.
+
+Theorems 20 and 21 are **not** refuted. The fix is to split the DP state by what
+the edited prefix ends with - layered `K` / `P` / `X` - which runs in the same
+`O(m^2 + mn)` bound. The paper's own parenthetical flags the hazard; a single
+table indexed by `(i, j)` simply cannot express the restriction.
+
+Full write-up in
+[errata-insertion-recurrence.md](docs/errata-insertion-recurrence.md); run the
+evidence with `pytest tests/property/test_published_recurrence.py`. The authors
+have not been contacted.
+
+## Free-space diagrams
+
+`experiments/freespace_viz.py` renders the continuous Fréchet free-space diagram,
+which is the clearest picture of why a single outlier is so destructive: one
+spike severs the free band, so no monotone path exists and ordinary Fréchet
+reports a large distance, even though the curves agree everywhere else.
+
+![Free-space diagram with one outlier vertex](docs/images/freespace_spike.png)
+
+Green is reachable from the origin, cream is free but unreachable, dark is
+blocked. Regenerate with `python -m experiments.freespace_viz`. This draws the
+*continuous* distance; continuous **edit** variants are not implemented.
 
 ## Tests
 
@@ -141,11 +169,19 @@ tamper-rejection tests.
 Alpha. The **library** is the deliverable and it is tested. The empirical side
 is deliberately limited:
 
-- Only **synthetic** evidence exists (level A). No real trajectory data was used
-  or downloaded. GeoLife and T-Drive forbid redistribution of the data *and*
-  of derivative works.
-- In the pilot, FED **tied** EDR, DTW and ERP at ceiling and did **not** beat
-  them. It beat raw discrete Fréchet decisively (Recall@1 1.000 vs 0.188).
+- Evidence reaches **level B**: real GeoLife trajectory geometry, with ground
+  truth known by construction from the injected corruption. That supports
+  "recovers the source trajectory under corruption"; it does **not** support any
+  claim about matching routes in the wild. **Level C** - blinded route-identity
+  annotation - is still blocked, and no dataset supplies those labels.
+- No trajectory data is in this repository and none may be. GeoLife's licence
+  permits non-commercial research and forbids redistributing the data *or any
+  derivative work*. Bring your own archive; see
+  [data-and-labels.md](docs/data-and-labels.md).
+- On real geometry, FED **tied** EDR, DTW and ERP at ceiling and did **not**
+  beat them. It beat raw discrete Fréchet decisively (Recall@1 1.000 vs 0.115).
+  `fed_insert` abstained on every query, because insertion cannot remove an
+  outlier; that is reported as coverage 0.00, not hidden.
 - Continuous variants, weak variants and substitutions are **not implemented**.
 
 See [limitations.md](docs/limitations.md). No claim is made that this is the

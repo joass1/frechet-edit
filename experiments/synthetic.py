@@ -130,13 +130,27 @@ def make_gallery(
     corridor_offset: float = 30.0,
     bulge: float = 120.0,
     detour_magnitude: float = 90.0,
+    bases: list[np.ndarray] | None = None,
 ) -> list[Route]:
-    """Build a gallery of ``n_families`` base routes plus hard negatives for each."""
+    """Build a gallery of ``n_families`` base routes plus hard negatives for each.
+
+    ``bases`` supplies the base curves explicitly, which is how evidence level B
+    swaps synthetic random walks for real trajectory geometry while leaving the
+    frozen hard-negative construction untouched. When it is ``None`` the bases
+    are generated synthetically, which is evidence level A.
+    """
+    if bases is not None and len(bases) < n_families:
+        raise ValueError(
+            f"need {n_families} base curves, got {len(bases)}"
+        )
     routes: list[Route] = []
     for f in range(n_families):
         family = f"fam{f:02d}"
-        base = make_route(rng, n_points, origin=(float(rng.uniform(-500, 500)),
-                                                 float(rng.uniform(-500, 500))))
+        if bases is not None:
+            base = np.asarray(bases[f], dtype=np.float64)
+        else:
+            base = make_route(rng, n_points, origin=(float(rng.uniform(-500, 500)),
+                                                     float(rng.uniform(-500, 500))))
         routes.append(Route(f"{family}-base", "base", family, base))
         routes.append(
             Route(f"{family}-corridor", "corridor", family, corridor_twin(base, corridor_offset))

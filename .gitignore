@@ -8,6 +8,9 @@ build/
 .mypy_cache/
 .ruff_cache/
 .hypothesis/
+.coverage
+coverage.xml
+htmlcov/
 artifacts/
 data/raw/
 data/interim/

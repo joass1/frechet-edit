@@ -1,0 +1,48 @@
+# Evidence level B: real GeoLife trajectory geometry, corruption-derived labels.
+#
+# FROZEN BEFORE THE FIRST RUN. Every spatial parameter is carried over unchanged
+# from configs/pilot.toml so that level A and level B differ in exactly one
+# thing: where the base curves come from. Nothing here was tuned on an outcome.
+#
+# The data is NOT in this repository and may not be. Place the archive at
+# data/raw/geolife-1.3-archive.zip (gitignored) first. See docs/data-and-labels.md.
+#
+# What this can support: "recovers the source trajectory under injected
+# corruption, on real GPS geometry". What it CANNOT support: any claim about
+# matching routes in the wild, which needs level C annotation that no dataset
+# supplies.
+
+gallery_source = "geolife"
+
+# Resample each real trace to a fixed 10 m vertex spacing, cropping to the first
+# 390 m. Raw GeoLife traces run for kilometres; spreading 40 vertices over a
+# whole trace would put vertices hundreds of metres apart and make a 25 m
+# threshold a different problem. This keeps the geometry real and the spatial
+# scale identical to level A.
+geolife_spacing_m = 10.0
+# Reject a candidate whose centroid is within 5 km of an already-chosen trace,
+# so two runs along the same arterial cannot become near-duplicate templates.
+geolife_min_separation_m = 5000.0
+
+seed = 20240612
+
+# Gallery: 12 families x (base + 4 hard negatives) = 60 templates. Larger than
+# the level A pilot because real traces are plentiful and the extra families buy
+# statistical power; the per-family structure is unchanged.
+n_families = 12
+n_points = 40
+
+# Queries
+queries_per_route = 2
+n_spikes = 2
+spike_magnitude = 150.0
+jitter_sigma = 2.0
+n_open_set_queries = 4
+
+# Scoring
+delta = 25.0
+eps = 25.0
+filter_window = 3
+ks = [1, 5]
+n_validation_families = 4
+threshold_quantile = 0.95
