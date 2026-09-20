@@ -85,6 +85,39 @@ the layered correction keeps the same `O(m^2 + mn)` bound. Full statement in
 `tests/property/test_published_recurrence.py`. The authors have not been
 contacted.
 
+## Independent review actually obtained
+
+**The erratum claim only.** One independent reviewer examined
+`docs/errata-insertion-recurrence.md` and returned **CONFIRMED**. What it
+actually did, which is the part that matters:
+
+* re-derived the true optimum of the witness by hand from the coupling
+  definition, keeping the inserted point symbolic and covering both insertion
+  positions, so the impossibility of one insertion is shown for every real `x`
+  rather than for sampled candidates;
+* fetched the LIPIcs **conference PDF** and extracted its text directly, rather
+  than trusting this repository's quotations, and matched the displayed
+  recurrence and base cases character-for-character against
+  `tests/oracles/published_recurrence.py`;
+* looked for a repair elsewhere in the paper - later passage, section 5.3,
+  footnote, appendix, the proof of Theorem 20 - and found none;
+* attacked the brute force's completeness, including proving and then
+  empirically testing the `max_ins = m` cap against a 3x wider cap over 250
+  random instances, with no mismatch;
+* ran its own adversarial instances in 1-D, 2-D and mixed mode, plus a
+  300-instance randomised search, finding no package disagreement.
+
+It raised four issues, all now fixed: the "gap is 1" reading (the error is in
+fact unbounded, section 7.1), shared geometric primitives between the two
+oracles (now literally independent), and stale pre-resolution framing in
+`limitations.md` and `recurrences.md`.
+
+**This does not promote any phase to PASSED.** It reviewed one claim, not the
+layered recurrence's correctness argument, not the geometry kernel, and not the
+package as a whole. Two earlier reviews aimed at those targets were terminated
+by API rate limits before reaching a verdict and have not been rerun. Everything
+in the table above therefore stays at READY_FOR_REVIEW.
+
 ## Defects found in the TESTS (not the package)
 
 **A property test asserted something untrue of floating point (fixed).**
