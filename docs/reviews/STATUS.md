@@ -22,13 +22,13 @@ green the test suite is. A passing suite is evidence, not a signoff.
 ## Verification actually run
 
 ```
-470 tests collected in total, split as:
-pytest -q -m "not slow"                     460 passed, 10 deselected
+577 tests collected in total, split as:
+pytest -q -m "not slow"                     567 passed, 10 deselected
 pytest -q -m slow                            10 passed  (exhaustive oracle tier)
-pytest -q -m "not slow and not realdata"    457 passed, 13 deselected  (CI's selection)
-pytest --cov=frechet_edit                    91% line coverage over src/frechet_edit
+pytest -q -m "not slow and not realdata"    564 passed, 13 deselected  (CI's selection)
+pytest --cov=frechet_edit                    99% line coverage over src/frechet_edit
 ruff check src tests experiments benchmarks examples   All checks passed
-mypy                          Success: no issues found in 11 source files
+mypy                          Success: no issues found in 12 source files
 python -m build               wheel + sdist
 python -m twine check dist/*  PASSED
 fresh venv + wheel install    examples run from outside the checkout
