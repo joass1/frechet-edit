@@ -9,6 +9,8 @@ corruptions that were injected.
 from __future__ import annotations
 
 import math
+import operator
+from fractions import Fraction
 
 import numpy as np
 from hypothesis import HealthCheck, assume, given, settings
@@ -27,6 +29,13 @@ coords = st.floats(
 )
 deltas = st.floats(min_value=0.05, max_value=20.0, allow_nan=False, allow_infinity=False)
 
+# Powers of two only: multiplying a float64 by one shifts the exponent and
+# leaves the significand alone, so the scaling is exact and its invariance is a
+# statement about the measure rather than about rounding. The range is chosen so
+# that neither `coords` (|x| <= 50) nor `deltas` (<= 20) can overflow or go
+# subnormal after scaling.
+exact_scales = st.sampled_from([float(2.0**k) for k in range(-10, 11)])
+
 
 def curves_1d(min_size=1, max_size=6):
     return st.lists(coords, min_size=min_size, max_size=max_size).map(
@@ -42,6 +51,22 @@ def curves_2d(min_size=1, max_size=5):
 
 def _cost(result):
     return math.inf if result.status == "infeasible" else float(result.cost)
+
+
+def _transform_is_exact(op, points, operand) -> bool:
+    """Did applying ``op`` to every coordinate round at all?
+
+    Compares the float64 result against the same operation carried out in exact
+    rationals. When they agree everywhere, the transform moved the geometry
+    without altering it, and an invariance assertion about it is meaningful.
+    When they do not, float64 has quietly produced a different point set and
+    any "invariance" would be a statement about rounding, not about the measure.
+    """
+    operand_array = np.broadcast_to(np.asarray(operand, dtype=np.float64), points.shape)
+    for value, other in zip(points.ravel(), operand_array.ravel(), strict=True):
+        if Fraction(float(op(value, other))) != op(Fraction(float(value)), Fraction(float(other))):
+            return False
+    return True
 
 
 class TestCoreInvariants:
@@ -87,10 +112,24 @@ class TestCoreInvariants:
             assert _cost(large) <= _cost(small), (mode, delta, bump)
 
     @SETTINGS
-    @given(ref=curves_1d(), obs=curves_1d(), delta=deltas, scale=st.floats(1e-3, 1e3))
+    @given(ref=curves_1d(), obs=curves_1d(), delta=deltas, scale=exact_scales)
     def test_common_scaling_of_coordinates_and_delta_preserves_cost(
         self, ref, obs, delta, scale
     ):
+        """Scaling coordinates and delta together by an EXACT factor.
+
+        The factors are powers of two on purpose. Multiplying a float64 by a
+        power of two only shifts its exponent, so the scaled problem really is
+        the original problem resized. An arbitrary factor rounds every
+        coordinate independently, which changes the geometry rather than
+        resizing it, exactly as the translation test below documents for
+        addition. Filtering arbitrary factors down to the exact ones was tried
+        and discarded: it threw away roughly 94 percent of inputs and
+        Hypothesis rightly flagged the resulting distribution as distorted.
+        """
+        assume(_transform_is_exact(operator.mul, ref, scale))
+        assume(_transform_is_exact(operator.mul, obs, scale))
+        assume(_transform_is_exact(operator.mul, np.array([[delta]]), scale))
         base = discrete_edit_distance(ref, obs, delta, operations="both")
         scaled = discrete_edit_distance(ref * scale, obs * scale, delta * scale, operations="both")
         assume("numerically_ambiguous" not in (base.status, scaled.status))
@@ -99,7 +138,27 @@ class TestCoreInvariants:
     @SETTINGS
     @given(ref=curves_2d(), obs=curves_2d(), delta=deltas, shift=st.tuples(coords, coords))
     def test_common_translation_preserves_cost(self, ref, obs, delta, shift):
+        """Translating both curves by the same EXACTLY REPRESENTABLE offset.
+
+        The exactness precondition is not a formality. float64 addition is
+        lossy, so a large enough offset silently destroys a small coordinate,
+        and the translated problem is then a genuinely different geometry
+        rather than the same one moved. Hypothesis found this:
+
+            ref = [(0, 0)],  obs = [(1.4e-45, 1)],  delta = 1,  shift = (1, 0)
+
+        Exactly, ``dist^2 = 1 + (1.4e-45)^2 > 1``, so the points are NOT within
+        delta and the cost is 2. After shifting, ``1.4e-45 + 1.0`` rounds to
+        ``1.0``, the x-coordinates coincide, the distance is exactly 1 = delta,
+        and the cost is 0. Both answers are correct for the input actually
+        given; it is the premise that the two inputs describe the same problem
+        that is false. Asserting invariance across a lossy transform would be
+        asserting something untrue of floating point, so the transform is
+        required to be exact first.
+        """
         offset = np.array(shift, dtype=np.float64)
+        assume(_transform_is_exact(operator.add, ref, offset))
+        assume(_transform_is_exact(operator.add, obs, offset))
         base = discrete_edit_distance(ref, obs, delta, operations="both")
         moved = discrete_edit_distance(ref + offset, obs + offset, delta, operations="both")
         assume("numerically_ambiguous" not in (base.status, moved.status))

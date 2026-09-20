@@ -85,6 +85,28 @@ the layered correction keeps the same `O(m^2 + mn)` bound. Full statement in
 `tests/property/test_published_recurrence.py`. The authors have not been
 contacted.
 
+## Defects found in the TESTS (not the package)
+
+**A property test asserted something untrue of floating point (fixed).**
+`test_common_translation_preserves_cost` asserted that translating both curves
+by a common offset leaves the cost unchanged. Hypothesis eventually found
+`ref = [(0, 0)]`, `obs = [(1.4e-45, 1)]`, `delta = 1`, `shift = (1, 0)`, where
+the cost is 2 before the shift and 0 after. Both answers are CORRECT: exactly,
+`dist^2 = 1 + (1.4e-45)^2 > 1` before, while `1.4e-45 + 1.0` rounds to `1.0`,
+so after the shift the points sit exactly on `delta` and the closed comparison
+admits them. float64 addition is lossy, so the translated input is a different
+geometry rather than the same one moved, and the invariance was never a
+property of the measure. Both the translation and scaling tests now require the
+transform to be exact - verified against rational arithmetic - before asserting
+anything about it, and the scaling test draws powers of two so the requirement
+costs no filtering. The instance is pinned in
+`tests/unit/test_numeric_boundary.py::TestALossyTranslationIsNotTheSameProblem`
+so that the behaviour is not later "fixed" into being wrong.
+
+This one is worth noting for what it says about the rest: the package's exact
+predicate policy is what made the two cases distinguishable at all. In pure
+float64 both configurations compare equal.
+
 ## Defects found and fixed during this work
 
 1. **Unsound collapsed recurrence (severity: CRITICAL, fixed).** The collapsed

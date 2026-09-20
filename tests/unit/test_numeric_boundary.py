@@ -246,3 +246,41 @@ class TestSmallSurfacesThatStillMustWork:
 
     def test_circumball_of_nothing_is_undetermined(self):
         assert circumball([]) is None
+
+
+class TestALossyTranslationIsNotTheSameProblem:
+    """Hypothesis found this while probing translation invariance.
+
+    It is NOT a bug, and the point of pinning it is to stop anyone "fixing" it.
+    Both answers below are correct for the input actually supplied; what is
+    false is the assumption that a float64 translation carries a geometry across
+    unchanged. `tests/property/test_invariants.py` now requires the transform to
+    be exact before asserting invariance over it.
+    """
+
+    # The smallest float32 subnormal. Adding 1.0 to it rounds straight back to
+    # 1.0, so the x-coordinate is annihilated by the shift.
+    TINY = 1.40129846e-45
+
+    def test_before_the_shift_the_points_are_outside_delta(self):
+        ref = np.array([[0.0, 0.0]])
+        obs = np.array([[self.TINY, 1.0]])
+        # Exactly: dist^2 = 1 + TINY^2, which is strictly greater than 1.
+        assert Fraction(self.TINY) ** 2 + 1 > 1
+        result = discrete_edit_distance(ref, obs, 1.0, operations="both")
+        assert result.cost == 2, "exact arithmetic must see past the float tie"
+
+    def test_after_the_shift_they_are_exactly_on_delta(self):
+        offset = np.array([1.0, 0.0])
+        ref = np.array([[0.0, 0.0]]) + offset
+        obs = np.array([[self.TINY, 1.0]]) + offset
+        # The shift absorbed TINY, so the x-coordinates now coincide exactly.
+        assert obs[0, 0] == ref[0, 0] == 1.0
+        result = discrete_edit_distance(ref, obs, 1.0, operations="both")
+        assert result.cost == 0, "distance is exactly delta, and <= is closed"
+
+    def test_the_float_tie_is_what_makes_this_subtle(self):
+        """In float64 both configurations look identical. Only exact arithmetic
+        separates them, which is the whole reason the predicate policy exists."""
+        assert self.TINY**2 + 1.0 == 1.0
+        assert self.TINY + 1.0 == 1.0
