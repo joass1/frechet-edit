@@ -95,11 +95,18 @@ Read this before using the package or citing anything from it.
   a proof of the implementation for all inputs.
 * Witness feasibility alone never establishes minimality; only oracle agreement
   does.
-* One real defect was found this way and is preserved: a collapsed
-  single-table form of the recurrence is UNSOUND once insertions are allowed.
-  See `docs/recurrences.md` section 3.2. Whether the published proofs carry the
-  restriction that this project's shorthand dropped is recorded as an open
-  verification item in `docs/paper-map.md`, not as a claimed erratum.
+* One real defect was found this way: the collapsed single-table form of the
+  recurrence is UNSOUND once insertions are allowed. See `docs/recurrences.md`
+  section 3.2.
+
+  An earlier revision of this file said the question of whether the PUBLISHED
+  proofs carry the restriction was "an open verification item, not a claimed
+  erratum". That is no longer the position and the sentence was wrong to leave
+  standing. Both published versions were subsequently checked directly and both
+  display the unrestricted vertical predecessor, so the defect is in the
+  publication and not only in this project's shorthand. It is now a claimed
+  erratum, stated in `docs/errata-insertion-recurrence.md` with the scope it
+  does and does not cover. The authors have still not been contacted.
 
 ## Provenance
 

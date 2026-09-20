@@ -13,10 +13,108 @@ satisfiable exactly when the minimum enclosing ball of its row range fits in
 delta; a kept point must itself be within delta of every row it covers.
 """
 import itertools
-
-from tests.oracles.published_recurrence import dist, meb_within
+from fractions import Fraction
 
 INF = float("inf")
+
+# Deliberately self-contained. An earlier revision imported `dist` and
+# `meb_within` from `published_recurrence`, which meant the two oracles the
+# erratum calls independent shared their geometric primitives. That never
+# touched the recurrence logic under test, so it could not have manufactured
+# the erratum's result - but "shares no recurrence with either" read as a
+# stronger independence claim than was actually true. These primitives are now
+# written from scratch here, so the claim is literal.
+
+
+def _sq_dist(a, b):
+    """Exact squared distance. Rational throughout: no tolerance, no rounding."""
+    return sum((Fraction(x) - Fraction(y)) ** 2 for x, y in zip(a, b, strict=True))
+
+
+def dist(a, b):
+    """Euclidean distance as a float, for comparisons against a float delta."""
+    return float(_sq_dist(a, b)) ** 0.5
+
+
+def _covering_point_exists(block, delta):
+    """Is there a point within ``delta`` of every point of ``block``?
+
+    Equivalent to "the minimum enclosing ball has radius <= delta", but derived
+    here the other way round - directly as the feasibility question the
+    insertion step actually asks - so that it shares no code with the enclosing
+    ball routines elsewhere in the tree.
+
+    Complete by the same defining-subset argument used in `_meb`: the smallest
+    covering ball is pinned by at most ``d + 1`` points of the block, so
+    enumerating those subsets, taking the ball each one determines, and keeping
+    any that covers the whole block is exhaustive. Solved in exact rationals by
+    Gaussian elimination on the equidistance conditions.
+    """
+    points = [tuple(Fraction(c) for c in p) for p in block]
+    unique = list(dict.fromkeys(points))
+    if len(unique) == 1:
+        return True
+    dim = len(unique[0])
+    limit = Fraction(delta) ** 2
+
+    def covers(centre):
+        return all(
+            sum((c - p) ** 2 for c, p in zip(centre, point, strict=True)) <= limit
+            for point in unique
+        )
+
+    for size in range(1, min(dim + 1, len(unique)) + 1):
+        for subset in itertools.combinations(unique, size):
+            centre = _equidistant_point(subset)
+            if centre is not None and covers(centre):
+                return True
+    return False
+
+
+def _equidistant_point(subset):
+    """The point equidistant from every member of ``subset``, in their affine
+    hull, or ``None`` when they do not determine one."""
+    base = subset[0]
+    if len(subset) == 1:
+        return base
+    vectors = [
+        tuple(a - b for a, b in zip(p, base, strict=True)) for p in subset[1:]
+    ]
+    size = len(vectors)
+    rows = [
+        [
+            2 * sum((a * b for a, b in zip(u, v, strict=True)), Fraction(0))
+            for v in vectors
+        ]
+        + [sum((c * c for c in u), Fraction(0))]
+        for u in vectors
+    ]
+    # Gauss-Jordan, exact.
+    for col in range(size):
+        pivot = next((r for r in range(col, size) if rows[r][col] != 0), None)
+        if pivot is None:
+            return None
+        rows[col], rows[pivot] = rows[pivot], rows[col]
+        lead = rows[col][col]
+        rows[col] = [v / lead for v in rows[col]]
+        for r in range(size):
+            if r != col and rows[r][col] != 0:
+                factor = rows[r][col]
+                rows[r] = [
+                    v - factor * w for v, w in zip(rows[r], rows[col], strict=True)
+                ]
+    centre = list(base)
+    for coeff, vector in zip([rows[i][size] for i in range(size)], vectors, strict=True):
+        for k, component in enumerate(vector):
+            centre[k] += coeff * component
+    return tuple(centre)
+
+
+def meb_within(block, delta):
+    """Kept for the call site below; now backed by this module's own geometry."""
+    if len(block) <= 1:
+        return True
+    return _covering_point_exists(block, delta)
 
 
 def _columns_feasible(pi, cols, delta):

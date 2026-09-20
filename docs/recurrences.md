@@ -146,14 +146,22 @@ every one the oracle sides with the layered form.
 REQUIRED for correctness in insertion and mixed modes, and the implementation
 uses it in both `_reference_dp` and `_discrete`.
 
-**Source status.** This document's collapsed form is this project's own
-shorthand, written while translating the published description. The
-counterexample refutes THAT transcription. It is not evidence about what the
-authors wrote: the published proofs may well carry the "ends with sigma_j"
-restriction in prose or in the definition of the DP state. This is recorded as
-an open verification item in `docs/paper-map.md` rather than as a claimed
-erratum, and the resolution is the same either way, since the layered form is
-proved correct in section 2 and agrees with an independent oracle.
+**Source status. RESOLVED, and it is the publication's recurrence too.** This
+paragraph previously said the collapsed form was only this project's shorthand,
+so the counterexample refuted the transcription rather than the paper, and that
+the published proofs "may well carry the restriction in prose". Both published
+versions were subsequently read directly, and neither does: the SoCG version of
+record (Sec. 5.2) and the arXiv full version (Sec. 5.2, and Sec. 5.3 for
+`edDP`) both display the unrestricted vertical predecessor, and no later
+passage constrains it. The paper's own parenthetical identifies the hazard
+without fixing it, and a single table indexed by `(i, j)` cannot express the
+restriction anyway.
+
+So this is now a claimed erratum against the publication, set out with its
+scope in `docs/errata-insertion-recurrence.md`. The resolution for this package
+is unchanged either way, since the layered form is proved correct in section 2
+and agrees with independent oracles. The published complexity theorems are not
+refuted.
 
 ## 4. Domination note
 

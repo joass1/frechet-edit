@@ -26,7 +26,7 @@ Scope of the defect:
 | Insertions only (`IedDP`) | 5.2 | has insertion branch | **unsound** |
 | Insertions and deletions (`edDP`) | 5.3 | has insertion branch | **unsound** |
 
-**What is not claimed.** Theorems 10/20 and 21 assert that `IedDF` and `edDF`
+**What is not claimed.** Theorems 10/20 and 11/21 assert that `IedDF` and `edDF`
 are computable in `O(m^2 + mn)` time. Those statements are **not** refuted. The
 corrected recurrence in section 6 below runs in the same asymptotic bound, so
 the results stand; what fails is the recurrence offered as the proof. This is an
@@ -182,7 +182,10 @@ Three implementations that share no recurrence were compared:
 2. **A definitional brute force**, which contains no dynamic program at all: it
    enumerates edited curves and monotone staircase couplings directly, placing
    each inserted point at the centre of the minimum enclosing ball of the block
-   it covers, with exact rational arithmetic for the radius test.
+   it covers, with exact rational arithmetic for the radius test. It imports
+   nothing but `itertools` and `fractions`; its geometry is written from
+   scratch in that file rather than shared with the transcription above, so
+   "shares no recurrence" is literal rather than approximate.
 3. **This package** (`frechet_edit.discrete_edit_distance`).
 
 Results:
@@ -195,12 +198,44 @@ Results:
 
 Every discrepancy is an **under**-estimate (292 under, 0 over), which is what
 the diagnosis predicts: the `min` ranges over a strictly too permissive set of
-predecessors. The largest gap observed in this range is 1. Failure density rises
-as `delta` falls relative to the spacing of `pi`: at `delta = 2.0` on the
+predecessors. The largest gap in that sweep is 1. Failure density rises as
+`delta` falls relative to the spacing of `pi`: at `delta = 2.0` on the
 `{0, 1, 2.5}` alphabet no failure occurs at all, because `mu(i)` collapses and
 the insertion branch stops competing.
 
 The package agreed with the definitional brute force on all 23480 comparisons.
+
+### 7.1 The error is not bounded by 1
+
+"Largest gap 1" is true of the small exhaustive sweep above and false in
+general, so it should not be read as a characterisation of the defect. On
+alternating curves the gap grows without bound. Take
+`pi = <0, 1, 0, 1, ...>` of length `m`, `sigma = <0>`, `delta = 0.4`, insertions
+only:
+
+| `m` | published | true optimum | gap |
+|---|---|---|---|
+| 3 | 1 | 2 | 1 |
+| 4 | 2 | 3 | 1 |
+| 5 | 2 | 4 | 2 |
+| 6 | 3 | 5 | 2 |
+| 7 | 3 | 6 | 3 |
+| 8 | 4 | 7 | 3 |
+| 9 | 4 | 8 | 4 |
+
+The true optimum is `m - 1`: consecutive vertices are 1 apart and `2 * delta`
+is 0.8, so no point can cover two of them, every vertex needs its own
+edited-curve point, and `sigma` supplies one. The published form returns about
+`(m - 1) / 2`, because it re-uses the single kept vertex once per alternation
+instead of once in total. The ratio therefore approaches **2**, and the
+absolute error grows linearly in `m`.
+
+This matters for how the defect is described. It is not an off-by-one at a
+numerical boundary; it is a structural error whose size scales with how often
+the optimal solution would have to return to a vertex it has already passed.
+
+Reproduced in
+`tests/property/test_published_recurrence.py::TestTheErrorIsNotBoundedByOne`.
 
 ## 8. Reproducing
 

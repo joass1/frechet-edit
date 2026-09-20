@@ -257,3 +257,36 @@ class TestDimensionsAboveThePlane:
             np.zeros((3, 12)), np.zeros((2, 12)), 1.0, operations="delete"
         )
         assert result.status == "optimal"
+
+
+class TestTheErrorIsNotBoundedByOne:
+    """The published form's error grows with the curve, it does not stay at 1.
+
+    The small exhaustive sweep above happens to top out at a gap of 1, which
+    makes the defect look like a boundary nuisance. On alternating curves the
+    gap is unbounded and the ratio approaches 2. Pinned here so the erratum's
+    section 7.1 table cannot drift from what the code actually produces.
+    """
+
+    @staticmethod
+    def _alternating(m):
+        return [(float(i % 2),) for i in range(m)]
+
+    @pytest.mark.parametrize(
+        "m,published,truth",
+        [(3, 1, 2), (4, 2, 3), (5, 2, 4), (6, 3, 5), (7, 3, 6), (8, 4, 7), (9, 4, 8)],
+    )
+    def test_gap_grows_with_curve_length(self, m, published, truth):
+        pi = self._alternating(m)
+        sigma = [(0.0,)]
+        assert paper_insertion_dp(pi, sigma, 0.4) == published
+        assert brute_edit_distance(pi, sigma, 0.4, "insert") == truth
+        assert _package(pi, sigma, 0.4, "insert") == truth
+
+    def test_true_optimum_is_m_minus_one(self):
+        """Consecutive vertices are 1 apart and 2*delta is 0.8, so no single
+        point covers two of them: every vertex needs its own edited-curve
+        point, and sigma supplies exactly one."""
+        for m in range(2, 9):
+            pi = self._alternating(m)
+            assert brute_edit_distance(pi, [(0.0,)], 0.4, "insert") == m - 1
