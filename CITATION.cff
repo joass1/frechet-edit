@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: "frechet-edit: strong discrete Frechet edit distance with verifiable witnesses"
+title: "frechet-edit: strong Frechet edit distance, discrete and continuous, with verifiable witnesses"
 message: >-
   This software is an INDEPENDENT implementation of algorithms published by
   Fox, Nayyeri, Perry and Raichel. If you use it, please cite BOTH this
@@ -9,7 +9,8 @@ type: software
 authors:
   - family-names: Lau
     given-names: Joash
-version: 0.1.0
+version: 0.2.0
+date-released: 2026-09-25
 license: MIT
 repository-code: "https://github.com/joass1/frechet-edit"
 keywords:

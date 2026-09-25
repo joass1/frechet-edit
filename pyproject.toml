@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "frechet-edit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Strong Frechet edit distance, discrete and continuous, with verifiable minimal-edit witnesses"
 readme = "README.md"
 requires-python = ">=3.10"

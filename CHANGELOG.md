@@ -3,6 +3,50 @@
 All notable changes to this project are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-09-25
+
+### Fixed
+
+- **The certified point predicate gave wrong answers near underflow.** Its
+  float64 tier accepted a decision whenever the squared distance and `delta**2`
+  were separated by a *relative* margin, which is not a bound once those
+  squares are subnormal (coordinates near `1e-162`). A 283849-case probe found
+  1555 confident wrong decisions, and the public API returned `cost=0` for
+  instances that are infeasible. Tier 1 now adds an absolute underflow
+  allowance and sends overflowed squares to the exact tier; the enclosing-ball
+  YES certificate uses the same test. Normal-range inputs are decided exactly
+  as before. Pinned in `tests/unit/test_numeric_boundary.py`.
+
+### Added
+
+- `continuous_edit_distance`: strong **continuous** Frechet edit distance,
+  deletion only (paper Section 4.1, Theorem 3), via the weighted DAG complex
+  and product free-space reachability, evaluated in anti-diagonal wavefronts.
+  Every comparison is exact: interval endpoints are ranked per segment with
+  outward-rounded float enclosures and an exact `x + s*sqrt(y)` fallback.
+  Optional `max_deletions` with a distinct `budget_exceeded` status.
+- `continuous_frechet_within` (ordinary continuous Frechet decision),
+  `continuous_frechet_le` and `verify_continuous_witness` (an independent exact
+  Alt-Godau verifier that shares no code with the solver); `verify_witness`
+  routes continuous results to it. `UnsupportedOperationError` for continuous
+  insertion, which is not implemented.
+- `docs/continuous.md`, including one deviation from the paper's prose:
+  explicit product-vertex propagation, needed for paths that wait at the last
+  observation vertex.
+- Course Check (`webapp/`, `docs/web-app.md`): a FastAPI + Leaflet web app that
+  audits a GPS track against a course with the continuous measure, with five
+  synthetic Marina Bay scenarios, GPX/GeoJSON/CSV upload, glitch ledger,
+  offset trace, GPX export, and unit, API and real-browser tests. Optional
+  extras `app` and `e2e`; not part of the installed package. Hardened after an
+  independent security review: bounded simplification work (an O(n^2)
+  Douglas-Peucker input had taken 315 s), a byte-counted body cap that chunked
+  requests cannot bypass, and refusal of cross-site browser POSTs.
+
+### Changed
+
+- `docs/limitations.md` no longer says that no real data was used; level B
+  GeoLife evidence has existed since 0.1.0.
+
 ## [0.1.0] - 2026-09-14
 
 First published release. Alpha: the discrete library is complete and tested,
