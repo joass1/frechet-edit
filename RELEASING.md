@@ -11,7 +11,7 @@ A release says "this is fit to depend on". Check that it is:
 
 - [ ] `pytest -q -m "not slow and not realdata"` green
 - [ ] `pytest -q -m slow` green
-- [ ] `ruff check src tests experiments benchmarks examples` clean
+- [ ] `ruff check src tests experiments benchmarks examples webapp` clean
 - [ ] `mypy` clean
 - [ ] CI green on all nine matrix jobs for the commit you are releasing
 - [ ] `CHANGELOG.md` has a dated section for this version
@@ -72,8 +72,8 @@ token, and never paste one into a shell that records history.
 ## After
 
 ```bash
-git tag -a v0.1.0 -m "v0.1.0"
-git push origin v0.1.0
+git tag -a vX.Y.Z -m "vX.Y.Z"
+git push origin vX.Y.Z
 ```
 
 Then open a GitHub release pointing at the changelog section.

@@ -17,7 +17,9 @@ a claim that none exists.
 | Amortised minimum queue | abbreviated | Sec. 5.2, Lem. 19 | `_minqueue.py` | `tests/unit/test_minqueue.py` |
 | Discrete insertion | Thm. 10 | Thm. 20 | `_reference_dp.py` branch `P` | `tests/unit/test_insertion.py` |
 | Discrete mixed edits | Thm. 11 | Sec. 5.3, Thm. 21 | `_reference_dp.py` (all branches) | `tests/unit/test_mixed.py` |
-| Continuous deletion | Sec. 4.1, Thm. 3 | numbering to re-verify | NOT IMPLEMENTED (stretch S2) | - |
+| Product of DAG complexes, multi-source reachability | Sec. 3 | Sec. 3, Thm. 2 | `_continuous.py: run` | `tests/unit/test_continuous.py` |
+| Continuous deletion | Sec. 4.1, Thm. 3 | Sec. 4.1, Thm. 3 | `_continuous.py`, `_freespace.py`, `api.continuous_edit_distance` | `tests/unit/test_continuous.py`, oracle `tests/oracles/continuous.py` |
+| Continuous insertion / mixed | Sec. 4.2-4.3 | Sec. 4.2-4.3, Thms. 14, 16 | NOT IMPLEMENTED | - |
 | Weak variants (NP-hardness) | Sec. 3 / 6 | Sec. 3 / 6 | NOT IMPLEMENTED, out of scope | - |
 | Substitutions | deferred by the authors | not supplied | NOT IMPLEMENTED (stretch S3) | - |
 
@@ -71,8 +73,15 @@ time plot is not a proof of an asymptotic bound.
   `docs/errata-insertion-recurrence.md`; executable evidence in
   `tests/property/test_published_recurrence.py`. Theorems 20 and 21 are NOT
   refuted: the layered correction runs in the same `O(m^2 + mn)` bound.
-- Exact full-version theorem numbering for the continuous deletion result.
-  Recorded as "to re-verify" rather than asserted.
+- ~~Exact full-version theorem numbering for the continuous deletion
+  result.~~ **RESOLVED:** the arXiv full version states it as Theorem 3 in
+  Section 4.1, checked against text extracted from the arXiv PDF.
+- **Continuous deletion, vertex propagation.** The paper propagates
+  reachability cell by cell. Read literally, that loses a path waiting at a
+  DAG vertex with no outgoing edge (the last observation vertex's copies) while
+  the reference advances; the smallest instance is `<0, 1, 0>` against
+  `<9, 0.5>` at `delta = 0.5`, optimum 1. This implementation propagates product
+  vertices explicitly (`docs/continuous.md` section 2.1). An edge case of the
+  prose, not a flaw in Theorem 3; not claimed as an erratum.
 
-Author correspondence has NOT been sent. Any such message requires the
-execution user's explicit authorisation.
+The first author was contacted about the erratum in September 2026.

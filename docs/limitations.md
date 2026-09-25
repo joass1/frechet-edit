@@ -10,12 +10,15 @@ Read this before using the package or citing anything from it.
   via minimum-enclosing-ball geometry - not restricted to reference vertices.
 * Replayable, independently verified minimal-edit witnesses.
 * A certified numerical policy with explicit abstention.
+* Strong **continuous** Frechet edit distance, **deletion only** (paper
+  Section 4.1, Theorem 3), with exact comparisons, witnesses and an independent
+  exact verifier. See `docs/continuous.md`.
 
 ## What is NOT implemented
 
 | feature | status |
 |---|---|
-| continuous (polygonal) Frechet edit distance | not implemented; stretch goal S2 |
+| continuous insertion and mixed edits | not implemented; they need the paper's minimum-link and canonical-subcurve machinery (`O(n m^5)` in the plane). Continuous DELETION is implemented. |
 | weak traversal variants | not implemented; the source proves NP-hardness for the relevant weak variants |
 | substitutions | not implemented; the authors defer the details, so this is a derivation project (S3), not a transcription |
 | weighted edit costs | out of scope |
@@ -73,17 +76,28 @@ Read this before using the package or citing anything from it.
 
 ## Evidence caveats
 
-* The only empirical evidence in this repository is **level A: synthetic**.
-  See `docs/experiment-protocol.md`.
-* **No real trajectory data was used or downloaded.** Nothing here supports a
-  claim about GPS traces, GeoLife, T-Drive, route recovery, or any deployment.
-  See `docs/data-and-labels.md`.
+* Empirical evidence reaches **level B**: real GeoLife trajectory geometry with
+  ground truth known by construction from injected corruption
+  (`docs/results-geolife.md`), on top of the level A synthetic pilot. That
+  supports "recovers the source trajectory under corruption" and nothing about
+  matching routes in the wild; level C is blocked. An earlier revision of this
+  file said no real data had been used, which stopped being true when level B
+  was run. See `docs/experiment-protocol.md`.
+* **No trajectory data is distributed here.** GeoLife's licence forbids
+  redistributing it or derivatives. See `docs/data-and-labels.md`.
+* The Course Check web app (`docs/web-app.md`) runs on **synthetic** scenarios.
+  It demonstrates the method; it is not evidence about real athletes, vehicles
+  or courses.
 * In the level A pilot, FED **tied** EDR, DTW and ERP at ceiling and did not
   beat them. It decisively beat raw discrete Frechet. Ceiling effects mean the
   pilot cannot rank the top methods, and no such ranking is claimed.
 * Performance numbers in `docs/performance.md` are single-machine measurements
   on curves of at most 400 points. They are not throughput guarantees and must
   not be extrapolated.
+* The continuous solver is `O(k^2 m n)` for a deletion budget `k` (Theorem 3),
+  `O(m n^3)` in the worst case. It is practical for budgets up to a few tens
+  at a few hundred vertices; `max_deletions` bounds it, and a result of
+  `budget_exceeded` is not a claim of infeasibility.
 * In deletion-only mode the "optimised" backend is slightly slower than the
   reference backend. That is measured and reported rather than omitted.
 
@@ -106,7 +120,8 @@ Read this before using the package or citing anything from it.
   display the unrestricted vertical predecessor, so the defect is in the
   publication and not only in this project's shorthand. It is now a claimed
   erratum, stated in `docs/errata-insertion-recurrence.md` with the scope it
-  does and does not cover. The authors have still not been contacted.
+  does and does not cover. The first author was contacted about it in
+  September 2026.
 
 ## Provenance
 

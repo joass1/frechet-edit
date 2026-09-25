@@ -246,8 +246,7 @@ pytest tests/property/test_published_recurrence.py -v
 ## 9. Status of this finding
 
 * Verified against the conference version of record and the arXiv full version.
-* **The authors have not been contacted.** Doing so requires the maintainer's
-  explicit authorisation, per `docs/limitations.md`.
+* The first author was contacted about this finding in September 2026.
 * No claim of priority is made. No search was performed for existing errata, so
   the possibility that this is already known is open, and a negative search
   would not establish novelty in any case.
