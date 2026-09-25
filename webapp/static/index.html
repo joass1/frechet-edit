@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Course Check</title>
+  <meta name="description" content="Audit a GPS track against a planned course with continuous Fréchet edit distance: did it follow the course, in order, and which fixes were glitches?">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231c1a17'/%3E%3Cpath d='M6 22 C11 8 17 26 26 10' stroke='%233fb8a9' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='19' cy='12' r='3' fill='%23ff7a33'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..800;1,9..144,300..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/vendor/leaflet/leaflet.js" defer></script>
+  <script src="/static/app.js" type="module"></script>
+</head>
+<body>
+  <a class="skip" href="#report">Skip to the report</a>
+
+  <header class="masthead">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M6 34 C14 10 24 40 42 12" class="brand-course"/>
+        <path d="M6 34 C14 10 24 40 42 12" class="brand-track"/>
+        <circle cx="30" cy="17" r="4" class="brand-glitch"/>
+      </svg>
+      <div>
+        <h1>Course Check</h1>
+        <p class="dek">Did the track follow the course, <em>in order</em>, and which GPS fixes were glitches?</p>
+      </div>
+    </div>
+    <p class="byline">Continuous Fréchet edit distance<br><span>Fox, Nayyeri, Perry &amp; Raichel · SoCG 2024 · Thm&nbsp;3</span></p>
+  </header>
+
+  <main class="layout">
+    <aside class="rail" aria-label="Audit setup">
+      <section class="step" aria-labelledby="step-1">
+        <h2 id="step-1"><span class="step-no">01</span>Pick a scenario</h2>
+        <ol class="scenarios" id="scenario-list"></ol>
+        <p class="fine">Synthetic runs around Marina Bay, Singapore, with ground truth known by construction.</p>
+      </section>
+
+      <section class="step" aria-labelledby="step-2">
+        <h2 id="step-2"><span class="step-no">02</span>Or bring your own</h2>
+        <div class="drops">
+          <label class="drop" id="course-drop">
+            <span class="drop-title">Course</span>
+            <input type="file" id="course-file" accept=".gpx,.geojson,.json,.csv,.txt">
+            <span class="drop-status" id="course-status">no file</span>
+          </label>
+          <label class="drop" id="track-drop">
+            <span class="drop-title">Track</span>
+            <input type="file" id="track-file" accept=".gpx,.geojson,.json,.csv,.txt">
+            <span class="drop-status" id="track-status">no file</span>
+          </label>
+        </div>
+        <p class="fine">GPX, GeoJSON (LineString), or CSV with <code>lat</code>, <code>lon</code> and optional <code>time</code> columns. Drop a file or click.</p>
+      </section>
+
+      <section class="step" aria-labelledby="step-3">
+        <h2 id="step-3"><span class="step-no">03</span>Set the tolerance</h2>
+        <div class="tolerance">
+          <output id="delta-out" for="delta">±25&nbsp;m</output>
+          <input type="range" id="delta" min="5" max="100" step="1" value="25" aria-describedby="delta-help" aria-label="Tolerance in metres">
+          <p id="delta-help" class="fine">How far from the course line still counts as on course: GPS error plus path width.</p>
+        </div>
+      </section>
+
+      <button id="run" class="run" type="button" disabled>
+        <span class="run-label">Run audit</span><span class="run-arrow" aria-hidden="true">→</span>
+      </button>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </aside>
+
+    <section class="stage" aria-label="Map and offset trace">
+      <div class="map-wrap">
+        <div id="map" class="map" role="region" aria-label="Map of the course and the track"></div>
+        <ul class="legend" aria-label="Map legend">
+          <li><span class="key key-corridor"></span>course ±δ corridor</li>
+          <li><span class="key key-track"></span>recorded track</li>
+          <li><span class="key key-clean"></span>cleaned track</li>
+          <li><span class="key key-glitch"></span>discarded glitch</li>
+          <li><span class="key key-off"></span>off course</li>
+        </ul>
+      </div>
+      <figure class="trace">
+        <figcaption>
+          <span class="trace-title">Distance from the course, fix by fix</span>
+          <span class="trace-readout" id="trace-readout" aria-live="off"></span>
+        </figcaption>
+        <svg id="trace" class="trace-svg" role="img" aria-label="No audit yet"></svg>
+      </figure>
+    </section>
+
+    <section class="report" id="report" tabindex="-1" aria-label="Audit report">
+      <div class="report-empty">
+        <p class="kicker">How it works</p>
+        <p>Pick a scenario and run the audit. The engine finds the <strong>fewest GPS fixes to discard</strong> so the rest of the track stays within the tolerance of the course, continuously and in order, from start to finish.</p>
+        <p>Few discards means glitches. No solution means the runner really left the course.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="colophon">
+    <p>Built on <code>frechet-edit</code>: exact arithmetic, witnesses re-checked by an independent verifier. Scenario data is synthetic. Map © <a href="https://www.openstreetmap.org/copyright" rel="noopener">OpenStreetMap</a> contributors.</p>
+  </footer>
+</body>
+</html>

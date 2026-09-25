@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "frechet-edit"
 version = "0.1.0"
-description = "Strong discrete Frechet edit distance with verifiable minimal-edit witnesses"
+description = "Strong Frechet edit distance, discrete and continuous, with verifiable minimal-edit witnesses"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -29,6 +29,11 @@ dependencies = ["numpy>=1.24"]
 [project.optional-dependencies]
 dev = ["pytest>=7.4", "pytest-cov>=4.1", "hypothesis>=6.90", "ruff>=0.5", "mypy>=1.8", "build>=1.0", "twine>=5.0"]
 experiments = ["matplotlib>=3.7", "tomli>=2.0; python_version < '3.11'"]
+# The course-audit web app in webapp/ (not part of the installed package).
+app = ["fastapi>=0.110", "uvicorn>=0.29", "python-multipart>=0.0.9", "httpx>=0.27"]
+# Browser end-to-end tests for the web app; also needs Edge, Chrome, or
+# `playwright install chromium`.
+e2e = ["playwright>=1.44"]
 
 [project.urls]
 Homepage = "https://github.com/joass1/frechet-edit"
@@ -45,16 +50,21 @@ where = ["src"]
 frechet_edit = ["py.typed"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "experiments"]
+testpaths = ["tests", "experiments", "webapp/tests"]
 markers = [
   "slow: exhaustive oracle comparisons and large sweeps (deselect with -m 'not slow')",
   "realdata: requires a locally provisioned, licence-checked dataset; never runs in CI",
+  "e2e: drives the web app in a real browser; skipped with a reason if no browser is available",
 ]
-filterwarnings = ["error::RuntimeWarning"]
+filterwarnings = [
+  "error::RuntimeWarning",
+  # starlette's TestClient warns about its own httpx dependency; not ours to fix.
+  "ignore:Using `httpx` with `starlette.testclient`:UserWarning",
+]
 
 [tool.ruff]
 line-length = 100
-src = ["src", "tests", "experiments"]
+src = ["src", "tests", "experiments", "webapp"]
 target-version = "py310"
 
 [tool.ruff.lint]
