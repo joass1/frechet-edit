@@ -136,6 +136,9 @@ token: an infeasible cost serializes as `null` alongside `status`.
 
 Weighted edit costs, substitutions, simultaneous editing of both curves,
 symmetrization, temporal penalties, endpoint locking, continuous (polygonal)
-variants, weak traversals, online/streaming input, and map matching. Any
+insertion and mixed variants, weak traversals, online/streaming input, and map
+matching. The continuous DELETION variant is implemented under its own
+contract, `docs/continuous.md`; nothing in this document applies to it unless
+that one says so. Any
 application-level composite score must be given its own name and must not be
 called FED.

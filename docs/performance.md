@@ -150,3 +150,34 @@ Peak allocation via `tracemalloc`, `m = 120`, `delta = 4`, mode `both`.
 * Any native or JIT backend. None exists; stretch goal S1 is not started.
 * Throughput on curves of thousands of points. The numbers above stop at 400
   and must not be extrapolated.
+
+## Continuous deletion (`continuous_edit_distance`)
+
+`python benchmarks/bench_continuous.py`: a sparse reference route of `m`
+vertices against a dense noisy observation of the same path (`n` fixes, 3 m
+noise) with injected spikes, `delta = 25`, witness included. One run per row
+on a laptop that was also running other jobs, so read the times as an order of
+magnitude.
+
+| m | n | spikes | discrete deletion | continuous deletion | time | budgets tried |
+|---|---|---|---|---|---|---|
+| 20 | 100 | 2 | infeasible | 2 | 0.11 s | 0, 1, 2 |
+| 30 | 200 | 3 | 148 | 3 | 0.21 s | 0, 1, 2, 4 |
+| 40 | 300 | 5 | 197 | 4 | 0.29 s | 0, 1, 2, 4 |
+| 60 | 400 | 8 | 184 | 8 | 0.98 s | 0, 1, 2, 4, 8 |
+| 60 | 600 | 10 | 290 | 10 | 2.29 s | 0, 1, 2, 4, 8, 16 |
+
+The discrete column is not a performance comparison: it shows that discrete
+Fréchet, matching vertices to vertices, cannot align a sparse reference with
+dense samples at all. In the 5-spike row one injected offset was only 28.9 m,
+and its component away from the route is under 25 m, so it is not a glitch at
+this `delta`; the four deleted indices are exactly the other four injected
+ones.
+
+Cost grows as `O(k^2 m n)` in the budget `k` (Theorem 3), and the budget
+search tries `0, 1, 2, 4, ...`, so a result costs roughly one run at a budget
+below twice the optimum. Where an answer is infeasible within the cap, the
+search runs to the cap: the web app's worst case, 150 course vertices against
+600 fixes with a cap of 25, measured 3.8 s. Exact arithmetic is used only
+where float enclosures overlap; repeated points are ranked once, which cut the
+two-lap web scenario from 3.2 s to 1.5 s.

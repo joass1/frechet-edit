@@ -8,6 +8,9 @@ are load-bearing:
   presented as mathematical infeasibility.
 * ``numerically_ambiguous`` is a reported outcome, not an exception and not a
   disguised infinity.
+* ``budget_exceeded`` (continuous solver only) means "no solution within the
+  caller's ``max_deletions``". It says nothing about larger budgets and is
+  never a disguised infinity either.
 """
 
 from __future__ import annotations
@@ -19,7 +22,7 @@ from typing import Any, Literal
 import numpy as np
 
 Operations = Literal["delete", "insert", "both"]
-Status = Literal["optimal", "infeasible", "numerically_ambiguous"]
+Status = Literal["optimal", "infeasible", "numerically_ambiguous", "budget_exceeded"]
 WitnessStatus = Literal["not_requested", "certified", "unavailable"]
 
 OPERATIONS: tuple[Operations, ...] = ("delete", "insert", "both")
@@ -28,6 +31,15 @@ BACKENDS: tuple[str, ...] = ("python", "reference")
 
 class UnsupportedDimensionError(ValueError):
     """Raised when a mode is asked for a dimension its backend does not certify."""
+
+
+class UnsupportedOperationError(ValueError):
+    """Raised when an edit mode exists in the theory but not in this package.
+
+    Continuous insertion and mixed edits need the paper's minimum-link and
+    canonical-subcurve machinery; they are not implemented, and asking for them
+    is an error rather than a silent fallback to deletion or to discrete.
+    """
 
 
 @dataclass(frozen=True, slots=True)

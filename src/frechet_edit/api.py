@@ -12,10 +12,11 @@ from typing import Any
 
 import numpy as np
 
-from . import _discrete, _reference_dp
+from . import _continuous, _discrete, _reference_dp
+from ._freespace import FreeSpace
 from ._numerics import NumericallyAmbiguous, PredicateStats
 from ._traceback import reconstruct
-from ._types import EditResult, Operations
+from ._types import Deletion, EditResult, Operations, UnsupportedOperationError
 from ._validation import (
     as_curve,
     check_backend,
@@ -26,7 +27,18 @@ from ._validation import (
     check_pair,
 )
 
-__all__ = ["discrete_edit_distance", "ordinary_discrete_frechet"]
+__all__ = [
+    "continuous_edit_distance",
+    "continuous_frechet_within",
+    "discrete_edit_distance",
+    "ordinary_discrete_frechet",
+]
+
+#: Largest recorded state, in bytes, for which a continuous witness is built.
+#: The witness needs the full ``(m, n, k+1, k+1)`` reachability table of the
+#: final run; beyond this the cost is still returned, with the witness marked
+#: unavailable rather than risking the host's memory.
+CONTINUOUS_WITNESS_MAX_BYTES = 512 * 1024 * 1024
 
 
 def discrete_edit_distance(
@@ -200,3 +212,198 @@ def ordinary_discrete_frechet(a: Any, b: Any) -> float:
     right = as_curve(b, "b")
     check_pair(left, right)
     return discrete_frechet(np.asarray(left), np.asarray(right))
+
+
+def continuous_frechet_within(a: Any, b: Any, delta: float) -> bool:
+    """Exact decision: is the ordinary CONTINUOUS Frechet distance ``<= delta``?
+
+    Curves are polygonal (linear between consecutive vertices). This is the
+    budget-0 case of the continuous deletion solver, so it shares that
+    solver's certified predicates and exact ranking. Comparisons are closed.
+    """
+    left = as_curve(a, "a")
+    right = as_curve(b, "b")
+    check_pair(left, right)
+    delta_value = check_delta(delta)
+    return _continuous.run(FreeSpace(left, right, delta_value), 0).cost == 0
+
+
+def _check_max_deletions(value: object) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, np.integer)):
+        raise ValueError(f"max_deletions must be a non-negative integer or None, got {value!r}")
+    if value < 0:
+        raise ValueError(f"max_deletions must be non-negative, got {value!r}")
+    return int(value)
+
+
+def continuous_edit_distance(
+    reference: Any,
+    observation: Any,
+    delta: float,
+    *,
+    operations: Operations = "delete",
+    return_witness: bool = False,
+    max_deletions: int | None = None,
+) -> EditResult:
+    """Fewest vertices to delete from ``observation`` so its polygonal curve is
+    within CONTINUOUS Frechet distance ``delta`` of ``reference``.
+
+    Both inputs are read as polygonal curves, linear between consecutive
+    vertices, which is what makes this measure robust to sampling density: a
+    sparse reference polyline and a densely sampled observation of the same
+    path are close, where discrete Frechet would force vertex-to-vertex
+    matches. Implements Section 4.1 (Theorem 3) of Fox, Nayyeri, Perry and
+    Raichel, SoCG 2024; see ``docs/continuous.md``.
+
+    Parameters
+    ----------
+    reference, observation:
+        ``(k, d)`` arrays of finite coordinates, any dimension, or 1-D arrays
+        read as scalars. Neither is mutated. Only ``observation`` is edited.
+    delta:
+        Finite, strictly positive threshold in coordinate units; closed.
+    operations:
+        Only ``"delete"``. Continuous insertion needs the paper's minimum-link
+        machinery and is not implemented; asking for it raises
+        :class:`UnsupportedOperationError` rather than silently doing something
+        else.
+    return_witness:
+        When true, also return which vertices to delete and the edited curve.
+    max_deletions:
+        Optional cap on the search. The running time is ``O(k^2 m n)`` for a
+        budget ``k``, so a cap bounds it; if no solution uses at most this many
+        deletions the result is ``status="budget_exceeded"``, which is NOT a
+        claim of infeasibility.
+
+    Returns
+    -------
+    EditResult
+        ``backend="continuous"``, ``mode="delete"``. ``status`` is
+        ``"optimal"``, ``"infeasible"`` (no non-empty subsequence works), or
+        ``"budget_exceeded"``. The cost is a COUNT of deletions, never a
+        distance. There is no discrete coupling; ``coupling`` is ``None``.
+    """
+    ref = as_curve(reference, "reference")
+    obs = as_curve(observation, "observation")
+    dim = check_pair(ref, obs)
+    delta_value = check_delta(delta)
+    mode = check_operations(operations)
+    if mode != "delete":
+        raise UnsupportedOperationError(
+            f"continuous_edit_distance supports operations='delete' only, got {mode!r}. "
+            "Continuous insertion needs minimum-link machinery that is not implemented; "
+            "use discrete_edit_distance for insertions."
+        )
+    cap_request = _check_max_deletions(max_deletions)
+
+    stats = PredicateStats()
+    base: dict[str, Any] = {
+        "mode": mode,
+        "delta": delta_value,
+        "dimension": dim,
+        "backend": "continuous",
+        "numeric_policy": "certified",
+    }
+    m, n = len(ref), len(obs)
+    # Discrete deletion is O(mn), certified, and never cheaper: a subsequence
+    # within discrete Frechet delta is within continuous Frechet delta.
+    discrete_cost, _ = _discrete.solve_cost(ref, obs, delta_value, "delete", stats=stats)
+    upper = None if math.isinf(discrete_cost) else int(discrete_cost)
+
+    space = FreeSpace(ref, obs, delta_value, stats=stats)
+    cap = n - 1 if cap_request is None else min(cap_request, n - 1)
+    cost, budgets = _continuous.best_cost(space, cap, upper)
+
+    counters: dict[str, Any] = {
+        "reference_length": m,
+        "observation_length": n,
+        "budgets_tried": budgets,
+        "discrete_deletion_upper_bound": upper,
+    }
+    counters.update(stats.as_dict())
+
+    if cost is None:
+        return _continuous_no_solution(base, counters, cap, n, cap_request, delta_value)
+
+    if not return_witness:
+        return EditResult(status="optimal", cost=cost, stats=counters, **base)
+
+    table_bytes = 4 * m * n * min(cost + 1, max(n - 1, 0)) * (cost + 1)
+    if table_bytes > CONTINUOUS_WITNESS_MAX_BYTES:
+        return EditResult(
+            status="optimal",
+            cost=cost,
+            witness_status="unavailable",
+            stats=counters,
+            detail=(
+                f"cost is exact; the witness table would need {table_bytes} bytes, above "
+                f"CONTINUOUS_WITNESS_MAX_BYTES={CONTINUOUS_WITNESS_MAX_BYTES}"
+            ),
+            **base,
+        )
+
+    kept = _continuous_witness(space, cost)
+    deleted = sorted(set(range(n)) - set(kept))
+    return EditResult(
+        status="optimal",
+        cost=cost,
+        witness_status="certified",
+        edited_curve=obs[kept].copy(),
+        edits=tuple(Deletion(idx) for idx in deleted),
+        coupling=None,
+        stats=counters,
+        **base,
+    )
+
+
+def _continuous_no_solution(
+    base: dict[str, Any],
+    counters: dict[str, Any],
+    cap: int,
+    n: int,
+    cap_request: int | None,
+    delta_value: float,
+) -> EditResult:
+    """``infeasible`` when the whole search space was covered, else ``budget_exceeded``."""
+    if cap >= n - 1:
+        return EditResult(
+            status="infeasible",
+            cost=math.inf,
+            stats=counters,
+            detail=(
+                "no non-empty subsequence of the observation is within continuous "
+                f"Frechet distance delta={delta_value!r} of the reference"
+            ),
+            **base,
+        )
+    return EditResult(
+        status="budget_exceeded",
+        cost=None,
+        stats=counters,
+        detail=(
+            f"no solution deletes at most max_deletions={cap_request} vertices; "
+            "a larger budget may succeed"
+        ),
+        **base,
+    )
+
+
+def _continuous_witness(space: FreeSpace, cost: int) -> list[int]:
+    """Kept observation indices of one optimal solution, re-derived and cross-checked."""
+    final = _continuous.run(space, cost, record=True)
+    if (
+        final.cost != cost
+        or final.tables is None
+        or final.end_vertex is None
+        or final.end_copy is None
+    ):
+        raise AssertionError("continuous witness run disagreed with the cost search")
+    kept = _continuous.traceback(space, final.tables, final.end_vertex, final.end_copy)
+    if space.n - len(kept) != cost:
+        raise AssertionError(
+            f"continuous traceback kept {len(kept)} of {space.n} vertices, "
+            f"inconsistent with cost {cost}"
+        )
+    return kept

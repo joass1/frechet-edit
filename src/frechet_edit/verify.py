@@ -8,11 +8,20 @@ step, and recomputes ordinary discrete Frechet on the edited curve with its own
 plain implementation.
 
 See ``docs/witness-invariants.md`` section 5.
+
+Continuous results (``backend="continuous"``) are checked by
+:func:`verify_continuous_witness`, which decides ``d_F <= delta`` on the edited
+curve with :func:`continuous_frechet_le`: a plain Alt-Godau free-space sweep in
+exact rational arithmetic, written separately from ``_continuous`` and
+``_freespace`` and using a different exact comparison technique (see its
+docstring). It shares no code with the continuous solver.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
+from fractions import Fraction
 
 import numpy as np
 
@@ -165,7 +174,13 @@ def verify_witness(
 
     A passing report establishes FEASIBILITY at the reported cost. It does not
     establish minimality; that comes from oracle agreement.
+
+    A result from :func:`~frechet_edit.continuous_edit_distance` is routed to
+    :func:`verify_continuous_witness`, since its witness has no discrete
+    coupling to check.
     """
+    if result.backend == "continuous":
+        return verify_continuous_witness(reference, observation, result)
     violations: list[str] = []
     reference = np.asarray(reference, dtype=np.float64)
     observation = np.asarray(observation, dtype=np.float64)
@@ -230,3 +245,209 @@ def verify_witness(
         replayed_curve=replayed,
         ordinary_frechet=ordinary,
     )
+
+
+# ---------------------------------------------------------------------------
+# Continuous Frechet: an exact decision procedure independent of the solver.
+# ---------------------------------------------------------------------------
+
+_Pt = tuple[Fraction, ...]
+#: The real number ``x + s * sqrt(y)``, as the triple ``(x, s, y)``.
+_Alg = tuple[Fraction, int, Fraction]
+_Span = tuple[_Alg, _Alg]
+_A_ZERO: _Alg = (Fraction(0), 0, Fraction(0))
+_A_ONE: _Alg = (Fraction(1), 0, Fraction(0))
+_REFINE_LIMIT_BITS = 16384
+
+
+def _alg_normal(r: _Alg) -> _Alg:
+    """Fold a rational square root into ``x``, so irrational roots stay distinct."""
+    x, s, y = r
+    if s == 0 or y == 0:
+        return (x, 0, Fraction(0))
+    num, den = y.numerator, y.denominator
+    rn, rd = math.isqrt(num), math.isqrt(den)
+    if rn * rn == num and rd * rd == den:
+        return (x + s * Fraction(rn, rd), 0, Fraction(0))
+    return r
+
+
+def _alg_bounds(r: _Alg, bits: int) -> tuple[Fraction, Fraction]:
+    x, s, y = r
+    if s == 0:
+        return x, x
+    root = math.isqrt((y.numerator * y.denominator) << (2 * bits))
+    scale = y.denominator << bits
+    lo, hi = Fraction(root, scale), Fraction(root + 1, scale)
+    return (x + lo, x + hi) if s > 0 else (x - hi, x - lo)
+
+
+def _alg_cmp(r1: _Alg, r2: _Alg) -> int:
+    """Exact order of two ``x + s*sqrt(y)`` numbers.
+
+    Equality: with irrational ``sqrt(y1)`` and ``sqrt(y2)``, ``x1 + s1 sqrt(y1)
+    == x2 + s2 sqrt(y2)`` forces ``x1 == x2``, ``s1 == s2`` and ``y1 == y2``
+    (otherwise one root would be rational), and an irrational never equals a
+    rational. Order: unequal reals separate under rational enclosures built
+    from integer square roots at increasing precision.
+    """
+    a, b = _alg_normal(r1), _alg_normal(r2)
+    if a == b:
+        return 0
+    if a[1] == 0 and b[1] == 0:
+        return (a[0] > b[0]) - (a[0] < b[0])
+    bits = 64
+    while bits <= _REFINE_LIMIT_BITS:
+        alo, ahi = _alg_bounds(a, bits)
+        blo, bhi = _alg_bounds(b, bits)
+        if ahi < blo:
+            return -1
+        if bhi < alo:
+            return 1
+        bits *= 2
+    raise ArithmeticError(f"verifier could not separate {a} from {b}")
+
+
+def _free_part(c: _Pt, u: _Pt, v: _Pt, d2: Fraction) -> _Span | None:
+    """Exact ``{t in [0, 1] : ||u + t(v - u) - c|| <= delta}``, or ``None`` if empty."""
+    d = [vk - uk for uk, vk in zip(u, v, strict=True)]
+    w = [uk - ck for uk, ck in zip(u, c, strict=True)]
+    qa = sum((x * x for x in d), Fraction(0))
+    qb = sum((x * y for x, y in zip(d, w, strict=True)), Fraction(0))
+    qc = sum((x * x for x in w), Fraction(0)) - d2
+    if qa == 0:
+        return (_A_ZERO, _A_ONE) if qc <= 0 else None
+    at_start = qc <= 0
+    at_end = qa + 2 * qb + qc <= 0
+    disc = qb * qb - qa * qc
+    if not (at_start or at_end) and (disc < 0 or not 0 < -qb < qa):
+        return None
+    centre, spread = -qb / qa, disc / (qa * qa)
+    return (
+        _A_ZERO if at_start else (centre, -1, spread),
+        _A_ONE if at_end else (centre, 1, spread),
+    )
+
+
+def _advance(free: _Span | None, straight: _Span | None, across: _Span | None) -> _Span | None:
+    """Reachable part of a cell's exit edge.
+
+    ``straight`` is the reachable part of the parallel entry edge, whose lowest
+    point must not be undercut; ``across`` is the reachable part of the
+    perpendicular entry edge, from which every free exit point is reachable by
+    convexity of the free space inside a cell.
+    """
+    if free is None:
+        return None
+    if across is not None:
+        return free
+    if straight is None or _alg_cmp(free[1], straight[0]) < 0:
+        return None
+    low = free[0] if _alg_cmp(free[0], straight[0]) >= 0 else straight[0]
+    return (low, free[1])
+
+
+def continuous_frechet_le(a: np.ndarray, b: np.ndarray, delta: float) -> bool:
+    """Exact ``d_F(a, b) <= delta`` for polygonal curves, by Alt-Godau.
+
+    Shares no code with the solver: exact rationals throughout, and endpoint
+    comparisons by normalisation plus integer-square-root refinement rather
+    than by the solver's squaring method. ``O(m n)`` cells of a few rational
+    operations each, so it is meant for checking, not for search.
+    """
+    pa = [tuple(Fraction(float(x)) for x in row) for row in _as_points(a)]
+    pb = [tuple(Fraction(float(x)) for x in row) for row in _as_points(b)]
+    if not pa or not pb:
+        raise ValueError("continuous Frechet needs two non-empty curves")
+    d2 = Fraction(float(delta)) ** 2
+
+    def close(u: _Pt, v: _Pt) -> bool:
+        return sum(((x - y) ** 2 for x, y in zip(u, v, strict=True)), Fraction(0)) <= d2
+
+    m, n = len(pa), len(pb)
+    if m == 1 or n == 1:
+        # One curve is a single point; by convexity the farthest point of the
+        # other curve from it is one of its vertices.
+        return all(close(u, v) for u in pa for v in pb)
+    if not (close(pa[0], pb[0]) and close(pa[-1], pb[-1])):
+        return False
+
+    # up[i][j]: reachable part of {i} x [j, j+1]; side[i][j]: of [i, i+1] x {j}.
+    up: list[list[_Span | None]] = [[None] * (n - 1) for _ in range(m)]
+    side: list[list[_Span | None]] = [[None] * n for _ in range(m - 1)]
+    for j in range(n - 1):
+        if not close(pa[0], pb[j]):
+            break
+        up[0][j] = _free_part(pa[0], pb[j], pb[j + 1], d2)
+    for i in range(m - 1):
+        if not close(pa[i], pb[0]):
+            break
+        side[i][0] = _free_part(pb[0], pa[i], pa[i + 1], d2)
+
+    for i in range(m - 1):
+        for j in range(n - 1):
+            up[i + 1][j] = _advance(
+                _free_part(pa[i + 1], pb[j], pb[j + 1], d2), up[i][j], side[i][j]
+            )
+            side[i][j + 1] = _advance(
+                _free_part(pb[j + 1], pa[i], pa[i + 1], d2), side[i][j], up[i][j]
+            )
+    return up[m - 1][n - 2] is not None or side[m - 2][n - 1] is not None
+
+
+def _as_points(curve: np.ndarray) -> np.ndarray:
+    arr = np.asarray(curve, dtype=np.float64)
+    return arr.reshape(-1, 1) if arr.ndim == 1 else arr
+
+
+def verify_continuous_witness(
+    reference: np.ndarray,
+    observation: np.ndarray,
+    result: EditResult,
+) -> VerificationReport:
+    """Check a continuous deletion witness: replay, recount, and decide exactly.
+
+    A passing report establishes FEASIBILITY at the reported cost - the edited
+    curve is the observation with exactly ``cost`` vertices deleted, and its
+    continuous Frechet distance to the reference is at most ``delta`` - by
+    exact arithmetic that shares no code with the solver. Minimality comes from
+    oracle agreement, not from here.
+    """
+    reference = _as_points(reference)
+    observation = _as_points(observation)
+
+    if result.witness_status != "certified":
+        return VerificationReport(
+            ok=False,
+            violations=[f"witness_status is {result.witness_status!r}, nothing to verify"],
+        )
+    if result.edits is None or result.edited_curve is None:
+        return VerificationReport(ok=False, violations=["witness fields are incomplete"])
+    if result.mode != "delete" or any(not isinstance(e, Deletion) for e in result.edits):
+        return VerificationReport(
+            ok=False, violations=["a continuous witness may contain deletions only"]
+        )
+
+    try:
+        replayed = replay(observation, result.edits)
+    except ValueError as exc:
+        return VerificationReport(ok=False, violations=[f"replay failed: {exc}"])
+
+    violations: list[str] = []
+    if replayed.shape != result.edited_curve.shape or not np.array_equal(
+        replayed, result.edited_curve
+    ):
+        violations.append(
+            f"replayed curve (shape {replayed.shape}) does not match the reported "
+            f"edited_curve (shape {result.edited_curve.shape})"
+        )
+    if result.cost is None or len(result.edits) != result.cost:
+        violations.append(f"witness has {len(result.edits)} edits but cost is {result.cost!r}")
+    if len(replayed) == 0:
+        violations.append("edited curve is empty; continuous Frechet needs a non-empty curve")
+    elif not continuous_frechet_le(reference, replayed, result.delta):
+        violations.append(
+            "independent exact check: the edited curve's continuous Frechet distance "
+            f"to the reference exceeds delta {result.delta!r}"
+        )
+    return VerificationReport(ok=not violations, violations=violations, replayed_curve=replayed)

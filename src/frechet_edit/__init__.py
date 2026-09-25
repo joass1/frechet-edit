@@ -1,7 +1,8 @@
-"""Strong discrete Frechet edit distance with verifiable minimal-edit witnesses.
+"""Strong Frechet edit distance with verifiable minimal-edit witnesses.
 
-An independent implementation of the discrete algorithms of Fox, Nayyeri,
-Perry and Raichel, *Frechet Edit Distance*, SoCG 2024
+An independent implementation of the discrete algorithms (deletion, insertion,
+both) and of the continuous deletion-only algorithm of Fox, Nayyeri, Perry and
+Raichel, *Frechet Edit Distance*, SoCG 2024
 (DOI 10.4230/LIPIcs.SoCG.2024.58; full version arXiv:2403.12878).
 
     >>> import numpy as np
@@ -13,7 +14,8 @@ Perry and Raichel, *Frechet Edit Distance*, SoCG 2024
     ('optimal', 1)
 
 The returned cost is a COUNT OF EDITS, not a distance. The measure is directed:
-edits apply to ``observation`` only. See ``docs/definition.md``.
+edits apply to ``observation`` only. See ``docs/definition.md`` and, for the
+continuous variant, ``docs/continuous.md``.
 """
 
 from ._numerics import NumericallyAmbiguous
@@ -22,9 +24,21 @@ from ._types import (
     EditResult,
     Insertion,
     UnsupportedDimensionError,
+    UnsupportedOperationError,
 )
-from .api import discrete_edit_distance, ordinary_discrete_frechet
-from .verify import VerificationReport, replay, verify_witness
+from .api import (
+    continuous_edit_distance,
+    continuous_frechet_within,
+    discrete_edit_distance,
+    ordinary_discrete_frechet,
+)
+from .verify import (
+    VerificationReport,
+    continuous_frechet_le,
+    replay,
+    verify_continuous_witness,
+    verify_witness,
+)
 
 __version__ = "0.1.0"
 
@@ -34,10 +48,15 @@ __all__ = [
     "Insertion",
     "NumericallyAmbiguous",
     "UnsupportedDimensionError",
+    "UnsupportedOperationError",
     "VerificationReport",
     "__version__",
+    "continuous_edit_distance",
+    "continuous_frechet_le",
+    "continuous_frechet_within",
     "discrete_edit_distance",
     "ordinary_discrete_frechet",
     "replay",
+    "verify_continuous_witness",
     "verify_witness",
 ]
