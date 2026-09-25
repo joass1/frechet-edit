@@ -73,6 +73,58 @@ def _gamma(d: int) -> float:
     return k / (1.0 - k)
 
 
+#: The smallest positive (subnormal) float64, 2**-1074.
+ETA: Final[float] = 2.0**-1074
+
+
+def _underflow_slack(d: int) -> float:
+    """Absolute error allowance that a relative bound cannot supply.
+
+    ``_gamma`` assumes no operation underflows. A product whose result is
+    subnormal instead carries an ABSOLUTE error of up to half of ``ETA``, which
+    can be most of the value, so near underflow a relative margin certifies
+    nothing. Additions of subnormals are exact, so only the ``d`` squares, the
+    square of ``delta`` and the few products in the comparison itself
+    contribute. This allows ``SAFETY * (d + 4)`` whole units of ``ETA``, several
+    times what those operations can introduce. For normal-range values it is
+    far below one ulp and changes no decision.
+    """
+    return SAFETY * (d + 4) * ETA
+
+
+def float_tier(d2: float, delta2: float, dim: int) -> bool | None:
+    """Tier 1 of the point predicate: ``True``/``False`` if certain, else ``None``.
+
+    ``d2`` is the float64-computed squared distance in ``dim`` dimensions and
+    ``delta2`` the float64-computed ``delta * delta``. The decision is accepted
+    only when the two error intervals are disjoint under both the relative
+    bound and the absolute underflow allowance.
+    """
+    certain_true, certain_false = float_tier_array(np.asarray([d2]), delta2, dim)
+    if certain_true[0]:
+        return True
+    if certain_false[0]:
+        return False
+    return None
+
+
+def float_tier_array(
+    d2: np.ndarray, delta2: float, dim: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Vectorised :func:`float_tier`: ``(certainly_within, certainly_outside)``.
+
+    An overflowed square (``inf``) is never certain either way; it goes to the
+    exact tier, where the rationals do not overflow.
+    """
+    g = SAFETY * _gamma(dim)
+    tol = SAFETY * U
+    slack = _underflow_slack(dim)
+    finite = np.isfinite(d2) & np.isfinite(delta2)
+    certain_true = finite & (d2 * (1.0 + g) + slack < delta2 * (1.0 - tol) - slack)
+    certain_false = finite & (d2 * (1.0 - g) - slack > delta2 * (1.0 + tol) + slack)
+    return certain_true, certain_false
+
+
 def frac_sq_dist(a: PointLike, b: PointLike) -> Fraction:
     """Exact squared Euclidean distance between two float64 points."""
     total = Fraction(0)
@@ -101,20 +153,16 @@ def within(
     The comparison is closed: equality counts as within.
     """
     diff = np.asarray(a, dtype=np.float64) - np.asarray(b, dtype=np.float64)
-    d2 = float(np.dot(diff, diff))
+    with np.errstate(over="ignore", under="ignore"):
+        d2 = float(np.dot(diff, diff))
+        delta2 = float(delta) * float(delta)
     dim = diff.shape[0]
-    delta2 = float(delta) * float(delta)
 
-    g = SAFETY * _gamma(dim)
-    tol = SAFETY * U
-    if d2 * (1.0 + g) < delta2 * (1.0 - tol):
+    decided = float_tier(d2, delta2, dim)
+    if decided is not None:
         if stats is not None:
             stats.float_decisions += 1
-        return True
-    if d2 * (1.0 - g) > delta2 * (1.0 + tol):
-        if stats is not None:
-            stats.float_decisions += 1
-        return False
+        return decided
 
     if policy == "fast":
         if stats is not None:
@@ -140,15 +188,13 @@ def within_row(
     decision is not certain are re-decided one at a time by the tiered policy,
     so the result is exactly what element-wise :func:`within` would produce.
     """
-    diff = curve - point
-    d2 = np.einsum("ij,ij->i", diff, diff)
+    with np.errstate(over="ignore", under="ignore"):
+        diff = curve - point
+        d2 = np.einsum("ij,ij->i", diff, diff)
+        delta2 = float(delta) * float(delta)
     dim = curve.shape[1]
-    delta2 = float(delta) * float(delta)
 
-    g = SAFETY * _gamma(dim)
-    tol = SAFETY * U
-    certain_true = d2 * (1.0 + g) < delta2 * (1.0 - tol)
-    certain_false = d2 * (1.0 - g) > delta2 * (1.0 + tol)
+    certain_true, certain_false = float_tier_array(d2, delta2, dim)
     out = certain_true.copy()
 
     boundary = ~(certain_true | certain_false)

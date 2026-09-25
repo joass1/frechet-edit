@@ -284,3 +284,76 @@ class TestALossyTranslationIsNotTheSameProblem:
         separates them, which is the whole reason the predicate policy exists."""
         assert self.TINY**2 + 1.0 == 1.0
         assert self.TINY + 1.0 == 1.0
+
+
+class TestUnderflowDoesNotDefeatTheErrorBound:
+    """A relative error bound is only a bound while nothing underflows.
+
+    Tier 1 of the point predicate once accepted a float decision whenever the
+    computed squared distance and ``delta**2`` were separated by a RELATIVE
+    margin. Once those squares fall into the subnormal range, a rounding error
+    is an absolute half-ulp of the smallest subnormal, which can be most of the
+    value itself, and the relative margin stops covering it. The predicate then
+    returned confident wrong answers without ever reaching the exact tier, and
+    the public API reported ``cost=0`` for instances that are infeasible.
+
+    Found by a randomised probe comparing ``within`` against ``exact_within``
+    with full-mantissa coordinates near 1e-162: 1555 disagreements in 283849.
+    """
+
+    # Exactly, ||A - B|| > DELTA; the float squares round the other way.
+    A = np.array([4.910520843898093e-162, -2.2347697463657823e-162])
+    B = np.array([6.251992576227831e-162, -8.655972948613568e-163])
+    DELTA = 1.5821386865831546e-162
+
+    def test_the_pinned_pair_is_outside_delta_exactly(self):
+        assert frac_sq_dist(self.A, self.B) > Fraction(self.DELTA) ** 2
+
+    def test_the_point_predicate_agrees_with_exact_arithmetic(self):
+        assert within(self.A, self.B, self.DELTA) is False
+
+    def test_the_public_api_does_not_report_a_feasible_zero(self):
+        ref, obs = self.A.reshape(1, 2), self.B.reshape(1, 2)
+        assert discrete_edit_distance(ref, obs, self.DELTA, operations="delete").status == (
+            "infeasible"
+        )
+        assert discrete_edit_distance(ref, obs, self.DELTA, operations="insert").status == (
+            "infeasible"
+        )
+        assert discrete_edit_distance(ref, obs, self.DELTA, operations="both").cost == 2
+
+    def test_randomised_agreement_with_exact_arithmetic_near_underflow(self):
+        rng = np.random.default_rng(20260924)
+        for _ in range(3000):
+            dim = int(rng.integers(1, 4))
+            scale = float(rng.choice([1e-160, 3e-162, 1e-162, 2e-163]))
+            a = rng.uniform(-4.0, 4.0, dim) * scale
+            b = rng.uniform(-4.0, 4.0, dim) * scale
+            true = math.sqrt(float(frac_sq_dist(a, b)))
+            delta = true * float(rng.uniform(0.7, 1.3))
+            if delta <= 0.0:
+                continue
+            assert within(a, b, delta) == (
+                frac_sq_dist(a, b) <= Fraction(delta) ** 2
+            ), (a.tolist(), b.tolist(), delta)
+
+    def test_a_power_of_two_rescale_into_underflow_leaves_every_cost_unchanged(self):
+        """Scaling every coordinate and delta by 2**-535 is exact, and every
+        predicate here is homogeneous, so the exact answers cannot move. The
+        squared distances, however, land in the subnormal range."""
+        scale = 2.0**-535
+        rng = np.random.default_rng(7)
+        for _ in range(150):
+            ref = rng.uniform(-3.0, 3.0, (int(rng.integers(1, 4)), 2))
+            obs = rng.uniform(-3.0, 3.0, (int(rng.integers(1, 4)), 2))
+            # Put delta within a few parts per million of a real vertex-pair
+            # distance, so that point predicates actually sit near the boundary.
+            i, j = int(rng.integers(len(ref))), int(rng.integers(len(obs)))
+            exact_dist = math.sqrt(float(frac_sq_dist(ref[i], obs[j])))
+            delta = exact_dist * (1.0 + float(rng.choice([-3e-6, -1e-6, 1e-6, 3e-6])))
+            for mode in ("delete", "insert", "both"):
+                big = discrete_edit_distance(ref, obs, delta, operations=mode)
+                small = discrete_edit_distance(
+                    ref * scale, obs * scale, delta * scale, operations=mode
+                )
+                assert (big.status, big.cost) == (small.status, small.cost), (mode, ref, obs)

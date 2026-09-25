@@ -19,8 +19,21 @@ Tier 1 - float64 with a rigorous error bound.
   (one rounding for each subtraction, one for each square, d-1 for the
   additions, bounded termwise). `delta^2` carries relative error <= u.
   A safety factor of 4 is applied. The decision is accepted when the two
-  intervals `[D2(1-4g), D2(1+4g)]` and `[delta^2(1-4u), delta^2(1+4u)]` are
-  disjoint. Otherwise the case is BOUNDARY and falls to tier 2.
+  intervals `[D2(1-4g) - s, D2(1+4g) + s]` and `[delta^2(1-4u) - s,
+  delta^2(1+4u) + s]` are disjoint. Otherwise the case is BOUNDARY and falls to
+  tier 2.
+
+  The absolute term `s = 4 (d + 4) eta`, with `eta = 2^-1074` the smallest
+  subnormal, is **required**, not decorative. The relative bound above holds
+  only while nothing underflows; a product whose result is subnormal carries an
+  absolute error of up to `eta / 2`, which can be most of the value. Without
+  `s`, squares in the subnormal range (coordinates near `1e-162`) produced
+  confident wrong decisions - 1555 in a 283849-case probe - and the public API
+  returned `cost=0` for infeasible instances. For normal-range values `s` is far
+  below one ulp and changes no decision. A square that overflows to `inf` is
+  never decided in tier 1. The same test (`_numerics.float_tier`) is used by the
+  YES certificate of the ball predicate. Pinned in
+  `tests/unit/test_numeric_boundary.py::TestUnderflowDoesNotDefeatTheErrorBound`.
 
 Tier 2 - exact rational arithmetic.
   float64 values are exact binary rationals, so `fractions.Fraction` decides PD

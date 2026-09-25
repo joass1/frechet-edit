@@ -33,12 +33,10 @@ from ._meb import ball_from_two as _ball_from_two
 from ._meb import encloses as _encloses
 from ._numerics import (
     EXACT_BALL_MAX_POINTS,
-    SAFETY,
     NumericallyAmbiguous,
     NumericPolicy,
     PredicateStats,
-    U,
-    _gamma,
+    float_tier,
     frac_sq_dist,
 )
 
@@ -276,10 +274,14 @@ def meb_radius_le(
     # from it is provably below delta^2 the point itself is the certificate -
     # whether or not it is the true minimum-enclosing centre.
     centre_f = np.array([float(c) for c in cand.centre], dtype=np.float64)
-    diff = block - centre_f
-    max_d2 = float(np.einsum("ij,ij->i", diff, diff).max())
+    with np.errstate(over="ignore", under="ignore"):
+        diff = block - centre_f
+        max_d2 = float(np.einsum("ij,ij->i", diff, diff).max())
+        delta2_f = delta_f * delta_f
     dim = block.shape[1]
-    if max_d2 * (1.0 + SAFETY * _gamma(dim)) < delta_f * delta_f * (1.0 - SAFETY * U):
+    # Same tier-1 test as the point predicate, including its underflow slack:
+    # a relative margin alone certifies nothing once the squares are subnormal.
+    if float_tier(max_d2, delta2_f, dim) is True:
         return True
 
     # Boundary. Fall back to exact arithmetic over the whole block.
@@ -288,7 +290,7 @@ def meb_radius_le(
         return True
 
     if policy == "fast":
-        return bool(max_d2 <= delta_f * delta_f)
+        return bool(max_d2 <= delta2_f)
 
     if stats is not None:
         stats.exact_fallbacks += 1
