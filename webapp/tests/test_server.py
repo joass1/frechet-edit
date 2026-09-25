@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 import pytest
+
+# The web app is an optional extra. Without it these tests are skipped with this
+# reason, rather than crashing collection for someone testing only the library.
+pytest.importorskip("fastapi", reason="web app extra not installed: pip install -e '.[app]'")
+
 from fastapi.testclient import TestClient
 
 from webapp import server
