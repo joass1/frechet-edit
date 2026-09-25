@@ -27,22 +27,24 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+          python -m pip install -e ".[dev,app]"
       # The fast suite must stay offline and deterministic. Real datasets are
       # never fetched here; see docs/data-and-labels.md. A missing dataset must
       # never let a skipped test read as a passing real-data gate, which is why
       # the `realdata` marker is deselected explicitly rather than left to skip.
+      # Browser tests (`e2e`) are deselected the same way and run in their own
+      # job below, where a browser is guaranteed.
       - name: Tests (fast)
-        run: python -m pytest -q -m "not slow and not realdata" --durations=10
+        run: python -m pytest -q -m "not slow and not realdata and not e2e" --durations=10
       - name: Verify no test was silently deselected to nothing
         shell: bash
         run: |
-          count=$(python -m pytest -q -m "not slow and not realdata" --collect-only 2>/dev/null | tail -1)
+          count=$(python -m pytest -q -m "not slow and not realdata and not e2e" --collect-only 2>/dev/null | tail -1)
           echo "collected: $count"
           python - <<'PY'
           import subprocess, sys
           out = subprocess.run(
-              [sys.executable, "-m", "pytest", "-m", "not slow and not realdata",
+              [sys.executable, "-m", "pytest", "-m", "not slow and not realdata and not e2e",
                "--collect-only", "-q"],
               capture_output=True, text=True,
           ).stdout
@@ -66,6 +68,31 @@ jobs:
       - name: Oracle agreement (slow)
         run: python -m pytest -q -m slow --durations=10
 
+  webapp-e2e:
+    name: Web app in a real browser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,app,e2e]"
+      # GitHub's Ubuntu image ships Google Chrome, so no browser download.
+      # A browser that fails to launch SKIPS these tests with the reason; the
+      # step below turns any skip into a failure so that cannot read as a pass.
+      - name: Browser end-to-end tests
+        # An explicit `shell: bash` runs with pipefail, so `tee` cannot hide a
+        # pytest failure.
+        shell: bash
+        env:
+          E2E_BROWSER_CHANNEL: chrome
+        run: python -m pytest -m e2e webapp/tests/test_e2e.py -rs -q | tee e2e.log
+      - name: Fail if any browser test was skipped
+        run: |
+          if grep -q "skipped" e2e.log; then echo "browser tests were skipped"; exit 1; fi
+
   quality:
     name: Lint, types, build
     runs-on: ubuntu-latest
@@ -76,11 +103,16 @@ jobs:
           python-version: "3.12"
       - run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+          python -m pip install -e ".[dev,app]"
       - name: Ruff
-        run: python -m ruff check src tests experiments benchmarks examples
+        run: python -m ruff check src tests experiments benchmarks examples webapp
       - name: Mypy (strict, package only)
         run: python -m mypy
+      - name: Mypy (strict, web app modules)
+        run: >
+          python -m mypy --strict --ignore-missing-imports
+          webapp/geo.py webapp/audit.py webapp/server.py webapp/scenarios.py
+          webapp/make_samples.py webapp/__main__.py
       - name: Build wheel and sdist
         run: |
           python -m build
